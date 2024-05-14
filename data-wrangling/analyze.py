@@ -62,6 +62,13 @@ parser.add_argument('--ramp_duration',
                     default=3.0, 
                     help='Duration (in hours) of the light ramps')
 
+parser.add_argument('--running_average', 
+                    metavar='Duration in minutes for the running average (smoothing) window', 
+                    type=int, 
+                    nargs='?', 
+                    default=30, 
+                    help='Defines the window for the running average, svaed to the fig_05 directory. Default is 30 minutes.')
+
 parser.add_argument('--exclude_animals', 
                     action='store_true', 
                     help='Specify "True" or "False" if you want to remove animals.')
@@ -95,6 +102,11 @@ datetime_end = pd.to_datetime(end_slice)
 
 delta_datetime = datetime_end - datetime_start
 num_days = delta_datetime.days
+
+# Running average
+smoothing_window = args.running_average # The window for our running average, in minutes
+
+
 
 print("\n\n\n")
 print("Running the analyze.py script, written by Kenneth O'Dell Jr.")
@@ -164,6 +176,12 @@ if not os.path.exists(sliced_path + '/fig_04'):
     print("Created fig_04 directory")
 else:
     print("OK. fig_04 exists")
+
+if not os.path.exists(sliced_path + '/fig_05'):
+    os.makedirs(sliced_path + '/fig_05')
+    print("Created fig_05 directory")
+else:
+    print("OK. fig_05 exists")
 
 # Directory for data and figures with excluded animals
 if not os.path.exists(exclude_animals_path):
@@ -361,6 +379,83 @@ def subplots_raw_sliced(data: pd.DataFrame,
     plt.tight_layout()
     return plt
    
+
+def plot_smooth_raw(data: pd.DataFrame, i: int, monitor_name: str = "Monitor", smoothing_window: int = 30):
+
+    data.plot(kind='line', legend=False, figsize = (12, 8)) # figsize is in inches
+
+    # Create DataFormatter for the x-axis
+    xformatter = mdates.DateFormatter('%Y-%m-%d')
+
+    # get the current axes
+    axs = plt.gca()
+
+    # set the x-axis formatter!
+    axs.xaxis.set_major_formatter(xformatter)
+
+    axs.xaxis.set_major_locator(mdates.DayLocator(interval=1))  # Set major tick every 3 days
+    axs.xaxis.set_major_formatter(mdates.DateFormatter('%d %b %y'))  # Format the datetime as 'HH:MM', instead of showing the whole dt
+    plt.tick_params('x', labelrotation=90)
+
+    # Customize the aesthetics
+    plt.title(monitor_name + " Running Average " + "(" + str(smoothing_window) + " min)")
+    plt.xlabel("Local Time")
+    plt.ylabel("Smoothed counts per minute")
+
+    plt.grid(False)
+    return plt
+
+def plot_smooth_sliced(data: pd.DataFrame, 
+                    i: int, 
+                    start_slice: str,
+                    end_slice: str,
+                    monitor_name: str = "",
+                    smoothing_window: int = 30):
+
+    # Assuming `data` is your DataFrame, we will create a plot with a single subplot.
+    fig, ax1 = plt.subplots(figsize=(12, 12))
+    # Thus, we only have one Axes object, and that's our entire dataframe.
+    data.plot(ax=ax1, legend=False)
+
+    # We need to do this MANUALLY
+    # Manually set the x-axis limits to a smaller range
+    start_time = pd.to_datetime(start_slice)  # replace 'your_start_time' with the actual start time. I use slice_start from earlier
+    end_time = start_time + timedelta(hours=24*num_days)  # end time is start_time plus 240 hours later
+    ax1.set_xlim([start_time, end_time]) # set the x-axis limit
+
+    # This is the range for the dates and/or times. We go from start to end, in 6h intervals
+    # This should actually be a list of datetime objects
+    date_range = pd.date_range(start=start_time, end=end_time, freq='6h')
+
+    # Set the x-axis ticks. There is one tick per interval, as defined in date_range
+    ax1.set_xticks(date_range)
+
+    # Generate the labels for the ticks
+    # Converts each item in date_range to a string, with the format %H:%M drawn from the date time.
+    labels = [time.strftime('%H:%M') for time in date_range]
+
+    # Set the x-axis labels
+    ax1.set_xticklabels(labels, rotation=90)  # Rotate the labels to make them more readable
+
+    # Minute ticks, so we have minute precision in specifying the light and dark bars
+    minute_ticks = pd.date_range(start=start_time, end=end_time, freq='1min')
+
+
+    ### DRAW LIGHT AND DARK BARS ###
+    drawLD(minute_ticks, ax1)
+    ### END OF LIGHT AND DARK BARS ###
+
+    # Customize the aesthetics
+    plt.title(monitor_name + " Running Average " + "(" + str(smoothing_window) + " min)")
+    plt.xlabel("Local Time")
+    plt.ylabel("Smoothed counts per minute")
+
+    plt.tight_layout()
+    return plt
+
+
+
+
 ###################################################
 ################ MAIN FUNCTION ####################
 ###################################################
@@ -420,6 +515,17 @@ if args.exclude_animals:
     # EXCLUDE ANIMALS
     # UPDATE monitor_files list
     # Basically run the same code as below, but with the exclusion of the animals you want to exclude.
+
+    monitor_slices = []
+    for i, monitor in enumerate(monitor_files):
+        monitor_slice = monitor[(monitor.index >= start_slice) & (monitor.index <= end_slice)]
+        monitor_slices.append(monitor_slice)
+        print(f"Sliced data for {just_file_names[i]}")
+        monitor_slice.to_csv(exclude_animals_path + '/sliced_data' + f"/sliced_{just_file_names[i]}", sep='\t')
+        print(f"Saved sliced data to {exclude_animals_path + '/sliced_data' + f'/sliced_{just_file_names[i]}' }")  
+    
+    
+    
     print("FOR TESTING - YOU ARE WANTING TO EXCLUDE ANIMALS, YES?!")
 
 #################
@@ -437,7 +543,8 @@ else:
 
         plot_raw(monitor,
                  i,
-                 just_file_names[i].replace('.txt', '')).savefig(result_path + '/fig_01/' + just_file_names[i].replace('.txt', '') + "_raw_data_fig_01.png")
+                 just_file_names[i].replace('.txt', '')
+                 ).savefig(result_path + '/fig_01/' + just_file_names[i].replace('.txt', '') + "_raw_data_fig_01.png")
         
         print(f"Saved raw data plot to {result_path + '/fig_01/' + just_file_names[i].replace('.txt', '') + '_raw_data_fig1.png'}")
 
@@ -447,12 +554,13 @@ else:
     ################
    
     for j, monitor in enumerate(monitor_files):
-        
+         
         subplots_raw(monitor,
-                     j,
-                     3, # Intervals of days for the x-axis
-                     just_file_names[j].replace('.txt', '')).savefig(result_path + '/fig_02/' + just_file_names[j].replace('.txt', '') + "_raw_individuals_fig_02.png")
-        
+            j,
+            3, # Intervals of days for the x-axis
+            just_file_names[j].replace('.txt', '')
+            ).savefig(result_path + '/fig_02/' + just_file_names[j].replace('.txt', '') + "_raw_individuals_fig_02.png")
+         
         print(f"Saved raw individuals data plot to {result_path + '/fig_02/' + just_file_names[j].replace('.txt', '') + '_raw_individuals_fig_02.png'}")
 
 
@@ -488,22 +596,68 @@ else:
     #################
     # Subplots of SLICED raw data for each animal
     ################
- 
+
     for j, slice in enumerate(monitor_slices):
-
-        subplots_raw_sliced(slice,
-                            j,
-                            start_slice,
-                            end_slice,
-                            1, # Intervals of days for the x-axis
-                            just_file_names[j].replace('.txt', '')
-                            ).savefig(sliced_path + '/fig_04/' + just_file_names[j].replace('.txt', '') + "_raw_individuals_sliced_fig_04.png")
-        
-        print(f"Saved raw individuals sliced data plot to {sliced_path + '/fig_04/' + just_file_names[j].replace('.txt', '') + '_raw_individuals_sliced_fig_04.png'}")
-
+ 
+         subplots_raw_sliced(slice,
+                             j,
+                             start_slice,
+                             end_slice,
+                             1, # Intervals of days for the x-axis
+                             just_file_names[j].replace('.txt', '')
+                             ).savefig(sliced_path + '/fig_04/' + just_file_names[j].replace('.txt', '') + "_raw_individuals_sliced_fig_04.png")
+         
+         print(f"Saved raw individuals sliced data plot to {sliced_path + '/fig_04/' + just_file_names[j].replace('.txt', '') + '_raw_individuals_sliced_fig_04.png'}")
+ 
     #################
     # Calculate running average (in minutes) for each animal column
     ################
+    smoothed_monitors = [] # Holds the smoothed data for each monitor, as PandasData frames
+
+    for i, monitor in enumerate(monitor_slices):
+
+        smoothed_monitor = pd.DataFrame()
+
+        for column in monitor.columns:
+
+            smoothed_monitor[column + '_run_avg_' + str(smoothing_window)] = monitor[column].rolling(window=smoothing_window).mean()
+
+        smoothed_monitor.index = monitor.index
+
+        smoothed_monitors.append(smoothed_monitor)
+  
+
+        print(f"Calculated running average of {smoothing_window} min for {just_file_names[i]}")
+
+ 
+    #################
+    # Plot the sliced running average!
+    ################
+
+    # Iterate through monitors and plot the smoothed data
+    for i, monitor in enumerate(smoothed_monitors):
+
+        plot_smooth_sliced(monitor,
+                            i,
+                            start_slice,
+                            end_slice,
+                            just_file_names[i].replace('.txt', ''),
+                            smoothing_window
+                            ).savefig(sliced_path
+                                + '/fig_05/'
+                                + just_file_names[i].replace('.txt', '')
+                                + '_smoothed_data_'
+                                + str(smoothing_window)
+                                + '_min_'
+                                + 'fig_05.png')
+        
+        print(f"Saved raw data plot to {sliced_path
+                                        + '/fig_05/'
+                                        + just_file_names[i].replace('.txt', '')
+                                        + '_smoothed_data_'
+                                        + str(smoothing_window)
+                                        + '_min_'
+                                        + 'fig_05.png'}")
 
 
     ################
