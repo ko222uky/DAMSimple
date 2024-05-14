@@ -7,7 +7,7 @@ That template was prone to breaking due to what I think was software rot, as wel
 
 ############ Requirements ############
 
-When, I tested the the .ipynb and .py, my current environment had the following installed packages.
+When I tested the the .ipynb and .py, my current environment had the following installed packages.
 This can be viewed in the requirements.txt and installed via:
 
 $ pip install -r requirements.txt
@@ -33,20 +33,22 @@ $ python analyze.py -h
 
 The experiment directory name is required.
 The start and end datetimes for slicing the data are required.
-The other arguments are optional.
 
-However, the default values of the optional flags were mainly used in testing.
+The other arguments are optional, but highly recommended to provide.
+The default values of the optional flags were mainly used in testing.
+
 You should include as arguments:
 
 --morning_ramp HH:MM
 --evening_ramp HH:MM
 --night_start HH:MM
 --ramp_duration {float}
---exclude_animals
+--running_average MM        # Running average is in minutes
+--exclude_animals           # Including this will perform analyses and save results to a separate directory for excluded animals
 
-Here's an example:
+Here's an example of running the script:
 
-$ python analyze.py rethomics-tutorial-data "2017-07-01 00:00:00" "2017-07-05 00:00:00" --DD_start_date 2017-07-03 --morning_ramp 9:00 --evening_ramp 22:00 --night_start 1:00 --ramp_duration 3
+$ python analyze.py rethomics-tutorial-data "2017-07-01 00:00:00" "2017-07-05 00:00:00" --DD_start_date 2017-07-03 --morning_ramp 6:00 --evening_ramp 18:00 --night_start 21:00 --ramp_duration 3 --running_average 60
 
 If you wish to exclude animals (i.e., remove columns), then add the --exclude_animals flag at the end.
 This will process data and place it in a separate directory for excluded animals.
