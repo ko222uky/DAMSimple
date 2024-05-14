@@ -101,12 +101,11 @@ print("Running the analyze.py script, written by Kenneth O'Dell Jr.")
 print("Today's date is: ", datetime.now())
 print(f"You have sliced a total of {num_days} days")
 
-
 # Create directories, if they don't exist.
 dir_path = "../" + args.directory
 cleaned_data_path = dir_path + "/cleaned_data_all_animals"
 result_path = dir_path + "/results_pre_sliced_all_animals"
-sliced_path = dir_path + "/sliced_data_all_animals" + str(num_days) + "_days_" + start_slice + "_to_" + end_slice
+sliced_path = dir_path + "/sliced_data_all_animals_" + str(num_days) + "_days_" + start_slice + "_to_" + end_slice
 exclude_animals_path = dir_path + "/excluded_animals"
 
 if not os.path.exists(dir_path):
@@ -213,7 +212,7 @@ def drawLD(minute_ticks, ax1):
                 # If the date is greater than the ramp_end_date, then we are in the DD period.
                 ax1.axvspan(minute_tick, minute_tick + pd.Timedelta(minutes=1), facecolor='black', alpha=0.3)
 
-def plot_raw(data: pd.DataFrame, i: int):
+def plot_raw(data: pd.DataFrame, i: int, monitor_name: str = "Monitor"):
 
     data.plot(kind='line', legend=False, figsize = (12, 8)) # figsize is in inches
 
@@ -231,7 +230,7 @@ def plot_raw(data: pd.DataFrame, i: int):
     plt.tick_params('x', labelrotation=90)
 
     # Customize the aesthetics
-    plt.title("Raw Locomotor Activity")
+    plt.title(monitor_name + " Raw Locomotor Activity")
     plt.xlabel("Local Time")
     plt.ylabel("Counts per minute")
 
@@ -239,7 +238,10 @@ def plot_raw(data: pd.DataFrame, i: int):
     return plt
 
 # Create a figure and a grid of subplots
-def subplots_raw(data: pd.DataFrame, j: int, days: int = 1):
+def subplots_raw(data: pd.DataFrame,
+                j: int,
+                days: int = 1,
+                monitor_name: str = "Monitor"):
 
     # Grid dimensions for our main figure that holds our axs subplots
     nrows = 4
@@ -265,11 +267,15 @@ def subplots_raw(data: pd.DataFrame, j: int, days: int = 1):
         axs[i].set_ylabel('counts/min', fontsize = 12)
         axs[i].set_xlabel('date', fontsize = 8)
 
-        
+    fig.suptitle(monitor_name + ' Raw Locomotor Activity Individuals', fontsize = 20) 
     plt.tight_layout()
     return plt
 
-def plot_raw_sliced(data: pd.DataFrame, i: int, start_slice: str, end_slice: str):
+def plot_raw_sliced(data: pd.DataFrame, 
+                    i: int, 
+                    start_slice: str,
+                    end_slice: str,
+                    monitor_name: str = ""):
 
     # Assuming `data` is your DataFrame, we will create a plot with a single subplot.
     fig, ax1 = plt.subplots(figsize=(12, 12))
@@ -305,7 +311,7 @@ def plot_raw_sliced(data: pd.DataFrame, i: int, start_slice: str, end_slice: str
     ### END OF LIGHT AND DARK BARS ###
 
     # Set titles and axes names
-    ax1.set_title('Raw Locomotor Activity ' + str(num_days) + "_days_" + start_slice + "_to_" + end_slice, fontsize = 16)
+    ax1.set_title(monitor_name + ' Raw Locomotor Activity ' + str(num_days) + "_days_" + start_slice + "_to_" + end_slice, fontsize = 16)
     ax1.set_ylabel('Counts per minute', fontsize = 14)
     ax1.set_xlabel('Local time', fontsize = 14)
 
@@ -313,7 +319,12 @@ def plot_raw_sliced(data: pd.DataFrame, i: int, start_slice: str, end_slice: str
     return plt
 
 # Create a figure and a grid of subplots
-def subplots_raw_sliced(data: pd.DataFrame, j: int, start_time: str, end_time: str, days: int = 1):
+def subplots_raw_sliced(data: pd.DataFrame, 
+                        j: int, 
+                        start_time: str, 
+                        end_time: str, 
+                        days: int = 1, 
+                        monitor_name: str = ""):
 
     # Grid dimensions for our main figure that holds our axs subplots
     nrows = 4
@@ -330,7 +341,6 @@ def subplots_raw_sliced(data: pd.DataFrame, j: int, start_time: str, end_time: s
         axs[i].set_title(name)
         
         # Aesthetics
-
         # Reformat the x-axis labels using datetime
         axs[i].xaxis.set_major_locator(mdates.DayLocator(interval=days))  # Set major tick every 3 days
         axs[i].xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))  # Format the datetime as 'HH:MM', instead of showing the whole dt
@@ -346,7 +356,8 @@ def subplots_raw_sliced(data: pd.DataFrame, j: int, start_time: str, end_time: s
         ### DRAW LIGHT AND DARK BARS ###
         drawLD(minute_ticks, axs[i])
         ### END OF LIGHT AND DARK BARS ###
-        
+
+    fig.suptitle(monitor_name + ' Raw Locomotor Activity ' + str(num_days) + "_days_" + start_slice + "_to_" + end_slice, fontsize = 16)
     plt.tight_layout()
     return plt
    
@@ -406,7 +417,10 @@ for i, monitor in enumerate(monitor_files):
 
 if args.exclude_animals:
     # ADD CODE HERE!!!
-    print("EXCLUDING ANIMALS!!!!!")
+    # EXCLUDE ANIMALS
+    # UPDATE monitor_files list
+    # Basically run the same code as below, but with the exclusion of the animals you want to exclude.
+    print("FOR TESTING - YOU ARE WANTING TO EXCLUDE ANIMALS, YES?!")
 
 #################
 # Else, plot all of the individuals!
@@ -420,7 +434,11 @@ else:
 
     # Iterate through monitors and plot raw data
     for i, monitor in enumerate(monitor_files):
-        plot_raw(monitor, i).savefig(result_path + '/fig_01/' + just_file_names[i].replace('.txt', '') + "_raw_data_fig_01.png")
+
+        plot_raw(monitor,
+                 i,
+                 just_file_names[i].replace('.txt', '')).savefig(result_path + '/fig_01/' + just_file_names[i].replace('.txt', '') + "_raw_data_fig_01.png")
+        
         print(f"Saved raw data plot to {result_path + '/fig_01/' + just_file_names[i].replace('.txt', '') + '_raw_data_fig1.png'}")
 
 
@@ -429,9 +447,13 @@ else:
     ################
    
     for j, monitor in enumerate(monitor_files):
-        subplots_raw(monitor, j, 3).savefig(result_path + '/fig_02/' + just_file_names[j].replace('.txt', '') + "_raw_individuals_fig_02.png")
+        
+        subplots_raw(monitor,
+                     j,
+                     3, # Intervals of days for the x-axis
+                     just_file_names[j].replace('.txt', '')).savefig(result_path + '/fig_02/' + just_file_names[j].replace('.txt', '') + "_raw_individuals_fig_02.png")
+        
         print(f"Saved raw individuals data plot to {result_path + '/fig_02/' + just_file_names[j].replace('.txt', '') + '_raw_individuals_fig_02.png'}")
-
 
 
     #################
@@ -452,7 +474,14 @@ else:
     #################
 
     for i, monitor in enumerate(monitor_slices):
-        plot_raw_sliced(monitor, i, start_slice, end_slice).savefig(sliced_path + '/fig_03/' + just_file_names[i].replace('.txt', '') + "_raw_sliced_data_fig_03.png")
+
+        plot_raw_sliced(monitor,
+                        i,
+                        start_slice,
+                        end_slice,
+                        just_file_names[i].replace('.txt', '')
+                        ).savefig(sliced_path + '/fig_03/' + just_file_names[i].replace('.txt', '') + "_raw_sliced_data_fig_03.png")
+        
         print(f"Saved raw data plot to {sliced_path + '/fig_03/' + just_file_names[i].replace('.txt', '') + '_raw_sliced_data_fig_03.png'}")
 
 
@@ -461,7 +490,15 @@ else:
     ################
  
     for j, slice in enumerate(monitor_slices):
-        subplots_raw_sliced(slice, j, start_time=start_slice, end_time=end_slice).savefig(sliced_path + '/fig_04/' + just_file_names[j].replace('.txt', '') + "_raw_individuals_sliced_fig_04.png")
+
+        subplots_raw_sliced(slice,
+                            j,
+                            start_slice,
+                            end_slice,
+                            1, # Intervals of days for the x-axis
+                            just_file_names[j].replace('.txt', '')
+                            ).savefig(sliced_path + '/fig_04/' + just_file_names[j].replace('.txt', '') + "_raw_individuals_sliced_fig_04.png")
+        
         print(f"Saved raw individuals sliced data plot to {sliced_path + '/fig_04/' + just_file_names[j].replace('.txt', '') + '_raw_individuals_sliced_fig_04.png'}")
 
     #################
