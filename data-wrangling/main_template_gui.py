@@ -20,7 +20,7 @@ class TextRedirector(object):
     def flush(self):
         pass  # This is needed for the file-like object.
 
-def run_script():
+def run_main_script():
     try:
         args = Namespace(
             directory=directory_entry.get(),
@@ -34,10 +34,11 @@ def run_script():
             running_average=int(running_average_entry.get())
         )
 
-        messagebox.showinfo("Running Analysis...",
-                            "This may take a few minutes. Please wait. The GUI will freeze until the analysis is complete.")
-        
+        messagebox.info("Initializing global analysis variables...")
+
         t_analyze.main(args, exclude_animals=exclude_animals_var.get())
+
+        messagebox.info("Initialization complete.")
 
 
     except Exception as e:
@@ -99,7 +100,7 @@ exclude_animals_checkbutton = tk.Checkbutton(root, text="Exclude Animals? Check 
                                             font=('sans',font_size))
 exclude_animals_checkbutton.pack()
 
-run_button = tk.Button(root, text="Run analysis", command=run_script)
+run_button = tk.Button(root, text="Run analysis", command=run_main_script)
 run_button.pack()
 
 output_text = tk.Text(root)
