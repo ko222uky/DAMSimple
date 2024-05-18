@@ -1,3 +1,5 @@
 /raw-data
 data-wrangling/*.ipynb
 data-wrangling/log.txt
+data-wrangling/__pycache__/
+data-wrangling/__pycache__

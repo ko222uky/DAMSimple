@@ -137,8 +137,7 @@ def plot_raw_sliced(data: pd.DataFrame,
     end_time = start_time + timedelta(hours=24*num_days)  # end time is start_time plus 240 hours later
     ax1.set_xlim([start_time, end_time]) # set the x-axis limit
 
-    # This is the range for the dates and/or times. We go from start to end, in 6h intervals
-    # This should actually be a list of datetime objects
+    # This date range will set the x-axis ticks. We go from start to end, in 6h intervals
     date_range = pd.date_range(start=start_time, end=end_time, freq='6h')
 
     # Set the x-axis ticks. There is one tick per interval, as defined in date_range
@@ -146,11 +145,12 @@ def plot_raw_sliced(data: pd.DataFrame,
 
     # Generate the labels for the ticks
     # Converts each item in date_range to a string, with the format %H:%M drawn from the date time.
-    labels = [time.strftime('%H:%M') for time in date_range]
+    labels = [interval.strftime('%H:%M') for interval in date_range]
 
     # Set the x-axis labels
     ax1.set_xticklabels(labels, rotation=90)  # Rotate the labels to make them more readable
 
+    # This date range is for drawing the LD bars at minute precision.
     # Minute ticks, so we have minute precision in specifying the light and dark bars
     minute_ticks = pd.date_range(start=start_time, end=end_time, freq='1min')
 
@@ -441,6 +441,7 @@ def smoothedPlot(smoothed_monitors: list[pd.DataFrame],
             ramp_time,
             ramp_end_date                                
             )
+        
         plot.savefig(sliced_path
             + '/fig_05/'
             + just_file_names[i].replace('.txt', '')
@@ -461,5 +462,5 @@ def smoothedPlot(smoothed_monitors: list[pd.DataFrame],
 
 # Guard to prevent script run on import
 if __name__ == "__main__":
-    exclude_animals = exclude_animals_var.get()
+    exclude_animals = EXCLUDE_ANIMALS_VAR.get()
     main(args, exclude_animals)
