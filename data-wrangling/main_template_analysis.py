@@ -1,47 +1,18 @@
 import pandas as pd
-import numpy as np
 
 import os
-import argparse
 import glob
 
 import matplotlib
 import matplotlib.pyplot as plt
 from datetime import time as dt_time
-
-import matplotlib.dates as mdates
 from datetime import datetime, timedelta
-
-# Declare global variables
-global exclude_animals_var
-global start_slice
-global end_slice
-global morning_ramp_start
-global evening_ramp_start
-global evening_ramp_end
-global ramp_time
-global ramp_end_date
-
-global num_days
-
-global smoothing_window
-
-global dir_path
-global cleaned_data_path
-global result_path
-global sliced_path
-global exclude_animals_path
-
-global monitor_files
-global monitor_file_names
-global just_file_names
-
-global smoothed_monitors
+import matplotlib.dates as mdates
 
 ###################################################
 ################ FUNCTION DEFINITIONS #############
 ###################################################
-
+# These are the minor plotting functions that will be used in the main tasks.
 # Function for drawing LD bars in graphs
 def drawLD(minute_ticks,
            ax1,
@@ -326,306 +297,12 @@ def plot_smooth_sliced(data: pd.DataFrame,
 ###################################################
 ################ MAIN FUNCTION ####################
 ###################################################
-
-def main(args=None, exclude_animals=False):
-
-    parser = argparse.ArgumentParser(description="Parse user input for the experiment details.")
-
-    parser.add_argument('directory', 
-                        type=str, 
-                        help='Enter name of the directory that contains your .txt data files.'
-                        ' Produced figures will be placed in the results directory.')
-
-    parser.add_argument('start_time', 
-                        type=str, 
-                        help='Enter the start time in the format "YYYY-MM-DD HH:MM:SS". Be sure to use double-quotes')
-
-    parser.add_argument('end_time', 
-                        type=str, 
-                        help='Enter the end time in the format "YYYY-MM-DD HH:MM:SS". Be sure to use double-quotes.')
-
-    parser.add_argument('--DD_start_date', 
-                        metavar='DD_start_date', 
-                        type=str, 
-                        nargs='?',
-                        default='9999-12-30', # This is a placeholder date that ideally will be replaced by the user
-                        help='The date in YYYY-MM-DD format (optional) provides the date for the end of LD and the start of DD')
-
-    parser.add_argument('--morning_ramp',
-                        metavar='Morning ramp start time', 
-                        type=str,
-                        nargs='?', 
-                        default='06:00', 
-                        help='The time in HH:MM format provides light onset for the morning ramp')
-
-    parser.add_argument('--evening_ramp', 
-                        metavar='Evening ramp start time', 
-                        type=str, nargs='?', 
-                        default='18:00', # You don't want to leave these default, honestly.
-                        help='The time in HH:MM format provides light down-ramp for the evening ramp')
-
-    parser.add_argument('--night_start', 
-                        metavar='Night start time', 
-                        type=str, 
-                        nargs='?', 
-                        default='21:00', 
-                        help='The time in HH:MM format provides the time when night (total dark) begins')
-
-    parser.add_argument('--ramp_duration', 
-                        metavar='Duration in hours for the ramp', 
-                        type=float, 
-                        nargs='?', 
-                        default=3.0, 
-                        help='Duration (in hours) of the light ramps')
-
-    parser.add_argument('--running_average', 
-                        metavar='Duration in minutes for the running average (smoothing) window', 
-                        type=int, 
-                        nargs='?', 
-                        default=30, 
-                        help='Defines the window for the running average, svaed to the fig_05 directory. Default is 30 minutes.')
-
-    if args is None:
-        args = parser.parse_args()
-    else:
-        # Namespace object is passed from the GUI, with name 'args'
-        # We need to convert it to a dictionary
-        args_dict = vars(args)
-
-        args_list = []
-
-        # The first three arguments are positional and not optional, so we need to handle that.
-        # The first three arguments are the directory, start_time, and end_time
-        for key, value in args_dict.items():
-            if key in ['directory', 'start_time', 'end_time']: # These are the positional arguments
-                args_list.append(value)
-            else:
-                args_list.append(f'--{key}={value}') # These are the optional arguments
-
-        args = parser.parse_args(args_list)
-
-    ###################################################
-    ################ HANDLING USER ARGUMENTS ##########
-    ###################################################
-
-    # Set global variables
-    start_slice = args.start_time # For taking the starting point when slicing the data later
-    end_slice = args.end_time
-
-    # DEFINE LD PERIODS FOR DRAWING LD BARS
-
-    # These are the datetime.time objects that define the start of the morning and evening ramps
-    morning_ramp_start = datetime.strptime(args.morning_ramp, '%H:%M').time()
-    evening_ramp_start = datetime.strptime(args.evening_ramp, '%H:%M').time()
-    evening_ramp_end = datetime.strptime(args.night_start, '%H:%M').time()
-    ramp_time = pd.Timedelta(hours=args.ramp_duration)  
-    ramp_end_date = datetime.strptime(args.DD_start_date, '%Y-%m-%d')
-
-    # calculate number of days in our slice
-    datetime_start = pd.to_datetime(start_slice)
-    datetime_end = pd.to_datetime(end_slice)
-    delta_datetime = datetime_end - datetime_start
-    num_days = delta_datetime.days
-
-    # Running average
-    smoothing_window = args.running_average # The window for our running average, in minutes
-
-    print("\n\n\n")
-    print("Running the analyze.py script, written by Kenneth O'Dell Jr.")
-    print("Today's date is: ", datetime.now())
-    print(f"You have sliced a total of {num_days} days")
-
-    # Create directories, if they don't exist.
-    dir_path = "../" + args.directory
-    cleaned_data_path = dir_path + "/cleaned_data_all_animals"
-    result_path = dir_path + "/results_pre_sliced_all_animals"
-    sliced_path = dir_path + "/sliced_data_all_animals_" + str(num_days) + "_days_" + start_slice + "_to_" + end_slice
-    exclude_animals_path = dir_path + "/excluded_animals"
-
-    if not os.path.exists(dir_path):
-        os.makedirs(dir_path)
-        print("Directory created: ", dir_path)
-    else:
-        print("OK. Directory exists: ", dir_path)
-
-    if not os.path.exists(cleaned_data_path):
-        os.makedirs(cleaned_data_path)
-        print("Cleaned data directory created: ", cleaned_data_path)
-    else:
-        print("OK. Cleaned data directory exists: ", cleaned_data_path)
-
-    if not os.path.exists(result_path):
-        os.makedirs(result_path)
-        print("Results created: ", result_path)
-    else:
-        print("OK. Results exists: ", result_path)
-
-    # Sliced data range
-    if not os.path.exists(sliced_path):
-        os.makedirs(sliced_path)
-        print("Sliced data directory created: ", sliced_path)
-    else:
-        print("OK. Sliced data directory exists: ", sliced_path)
-
-    # Sliced data in the sliced directory
-    if not os.path.exists(sliced_path + '/sliced_data'):
-        os.makedirs(sliced_path + '/sliced_data')
-        print("Sliced data directory created: ", sliced_path + '/sliced_data')
-    else:
-        print("OK. Sliced data directory exists: ", sliced_path + '/sliced_data')
-
-    # figure directories
-    if not os.path.exists(result_path + '/fig_01'):
-        os.makedirs(result_path + '/fig_01')
-        print("Created fig_01 directory")
-    else:
-        print("OK. fig_01 exists")
-
-    if not os.path.exists(result_path + '/fig_02'):
-        os.makedirs(result_path + '/fig_02')
-        print("Created fig_02 directory")
-    else:
-        print("OK. fig_02 exists")
-
-    if not os.path.exists(sliced_path + '/fig_03'):
-        os.makedirs(sliced_path + '/fig_03')
-        print("Created fig_03 directory")
-    else:
-        print("OK. fig_03 exists")
-
-    if not os.path.exists(sliced_path + '/fig_04'):
-        os.makedirs(sliced_path + '/fig_04')
-        print("Created fig_04 directory")
-    else:
-        print("OK. fig_04 exists")
-
-    if not os.path.exists(sliced_path + '/fig_05'):
-        os.makedirs(sliced_path + '/fig_05')
-        print("Created fig_05 directory")
-    else:
-        print("OK. fig_05 exists")
-
-    # Directory for data and figures with excluded animals
-    if not os.path.exists(exclude_animals_path):
-        os.makedirs(exclude_animals_path)
-        print("Created exclude_animals directory")
-    else:
-        print("OK. exclude_animals exists")
-
-
-    ###################################################
-    ################ READ IN THE DATA #################
-    ###################################################
-
-    monitor_files = []          # Holds the Pandas DataFrame objects
-    monitor_file_names = []     # Holds the file paths of the monitor files
-    just_file_names = []        # Holds the file names without the path
-
-    for i, txt in enumerate(glob.glob(os.path.join(dir_path, '*txt'))):
-        monitor = pd.read_csv(txt, sep='\t', header=None)
-        print(f"Loaded monitor data from {txt}")
-        monitor_files.append(monitor)
-        monitor_file_names.append(txt)
-
-        just_file_names.append(monitor_file_names[i][len(dir_path)+1:])
-
-    # Check to see that our monitor files are correct
-    for monitor in monitor_files:
-        monitor.info()
-
-    # Obtain datetimes for each monitor
-    # The resulting format should be compatible withn Rethomics in R.
-    time_col = []
-    date_col = []
-    datetime_index = []
-
-    for i, monitor in enumerate(monitor_files):
-        time_col.append(monitor.iloc[:,2])
-        date_col.append(monitor.iloc[:,1])
-        concat_datetime = date_col[i] + " " + time_col[i]
-        datetime_index.append(pd.to_datetime(concat_datetime, format='%d %b %y %H:%M:%S'))
-        print(f"Converted date and time columns to datetime for {monitor_file_names[i]}")
-
-    # New column names for the animals
-    column_nums = pd.Series(range(1, 33)) # For monitors that hold 32 animals
-    animal_nums = "animal_" + column_nums.astype(str)
-
-
-    # Clean the data by grabbing only activity columns
-    for i, monitor in enumerate(monitor_files):
-        activity = monitor.iloc[: , 10:42]
-        activity.index = datetime_index[i]
-        activity.columns = animal_nums
-        
-        monitor_files[i] = activity # update the monitor df in our list
-
-        activity.to_csv(cleaned_data_path + f"/cleaned_{just_file_names[i]}", sep='\t')
-        print(f"Cleaned data for {just_file_names[i]}")
-        print(f"Saved cleaned data to {cleaned_data_path + '/cleaned_' + just_file_names[i]}")
-
-
-    # Slice our data
-    monitor_slices = []
-    for i, monitor in enumerate(monitor_files):
-        monitor_slice = monitor[(monitor.index >= start_slice) & (monitor.index <= end_slice)]
-        monitor_slices.append(monitor_slice)
-        print(f"Sliced data for {just_file_names[i]}")
-        print(f"Saved sliced data to {sliced_path + '/sliced_data' + f'/sliced_{just_file_names[i]}' }")
-        monitor_slice.to_csv(sliced_path + '/sliced_data' + f"/sliced_{just_file_names[i]}", sep='\t')
-
-
-    # Calculate running average (in minutes) for each animal column
-    smoothed_monitors = [] # Holds the smoothed data for each monitor, as PandasData frames
-
-    for i, monitor in enumerate(monitor_slices):
-
-        smoothed_monitor = pd.DataFrame()
-
-        for column in monitor.columns:
-
-            smoothed_monitor[column + '_run_avg_' + str(smoothing_window)] = monitor[column].rolling(window=smoothing_window).mean()
-
-        smoothed_monitor.index = monitor.index
-
-        smoothed_monitors.append(smoothed_monitor)
-
-        print(f"Calculated running average of {smoothing_window} min for {just_file_names[i]}")
-
-
-    # Calculate avg and std for each animal column
-
-
-    #################
-    # If animals are to be excluded, we do so here!
-    #################
-
-    if exclude_animals:
-        # ADD CODE HERE!!!
-        # EXCLUDE ANIMALS
-        # UPDATE monitor_files list
-        # Basically run the same code as below, but with the exclusion of the animals you want to exclude.
-
-        monitor_slices = []
-        for i, monitor in enumerate(monitor_files):
-            monitor_slice = monitor[(monitor.index >= start_slice) & (monitor.index <= end_slice)]
-            monitor_slices.append(monitor_slice)
-            print(f"Sliced data for {just_file_names[i]}")
-            monitor_slice.to_csv(exclude_animals_path + '/sliced_data' + f"/sliced_{just_file_names[i]}", sep='\t')
-            print(f"Saved sliced data to {exclude_animals_path + '/sliced_data' + f'/sliced_{just_file_names[i]}' }")  
-        
-        print("FOR TESTING - YOU ARE WANTING TO EXCLUDE ANIMALS, YES?!")
-
-###################################################
-################ END MAIN  ########################
-###################################################
-
-
 ###################################################
 ################ PLOT TASKS  ######################
 ###################################################
 
-def rawPlot(monitor_files: List[pd.DataFrame],
-            just_file_names: List[str],
+def rawPlot(monitor_files: list[pd.DataFrame],
+            just_file_names: list[str],
             result_path: str
             ):
     #################
@@ -659,8 +336,8 @@ def rawPlot(monitor_files: List[pd.DataFrame],
             print(f"Saved raw individuals data plot to {result_path + '/fig_02/' + just_file_names[j].replace('.txt', '') + '_raw_individuals_fig_02.png'}")
 
 
-def slicedPlot(monitor_slices: List[pd.DataFrame],
-                just_file_names: List[str],
+def slicedPlot(monitor_slices: list[pd.DataFrame],
+                just_file_names: list[str],
                 sliced_path: str,
                 start_slice: str,
                 end_slice: str,
@@ -677,6 +354,7 @@ def slicedPlot(monitor_slices: List[pd.DataFrame],
     #################
 
     for i, monitor in enumerate(monitor_slices):
+
         plot = plot_raw_sliced(monitor,
                         i,
                         num_days,
@@ -693,8 +371,8 @@ def slicedPlot(monitor_slices: List[pd.DataFrame],
         plt.close()
         print(f"Saved raw data plot to {sliced_path + '/fig_03/' + just_file_names[i].replace('.txt', '') + '_raw_sliced_data_fig_03.png'}")
 
-def slicedIndividualPlot(monitor_slices: List[pd.DataFrame],
-                just_file_names: List[str],
+def slicedIndividualPlot(monitor_slices: list[pd.DataFrame],
+                just_file_names: list[str],
                 sliced_path: str,
                 start_slice: str,
                 end_slice: str,
@@ -730,16 +408,23 @@ def slicedIndividualPlot(monitor_slices: List[pd.DataFrame],
         print(f"Saved raw individuals sliced data plot to {sliced_path + '/fig_04/' + just_file_names[j].replace('.txt', '') + '_raw_individuals_sliced_fig_04.png'}")
 
 
-def smoothedPlot(smoothed_monitors: List[pd.DataFrame],
-                 just_file_names: List[str],
+def smoothedPlot(smoothed_monitors: list[pd.DataFrame],
+                 just_file_names: list[str],
+                num_days: int,
+                start_slice: str,
+                end_slice: str,
+                smoothing_window: int,
+                morning_ramp_start: dt_time,
+                evening_ramp_start: dt_time,
+                evening_ramp_end: dt_time,
+                ramp_time: timedelta,
+                ramp_end_date: datetime,
                 sliced_path: str,
-                smoothing_window: int
                 ):
         
     #################
     # Plot the sliced running average!
     ################
-
     # Iterate through monitors and plot the smoothed data
     for i, monitor in enumerate(smoothed_monitors):
 
@@ -772,9 +457,6 @@ def smoothedPlot(smoothed_monitors: List[pd.DataFrame],
                                         {str(smoothing_window)},
                                         '_min_',
                                         'fig_05.png')
-                                            
-
-
 
 
 # Guard to prevent script run on import
