@@ -3,6 +3,8 @@ import tkinter as tk
 from tkinter import ttk  # access to the Tk themed widget set
 from tkinter import messagebox
 
+import threading
+
 import os
 import glob
 import sys  # For outputting stoud to the text widget
@@ -98,7 +100,8 @@ def loadData():
         )  # The window for our running average, in minutes
 
         print("\n\n\n")
-        print("Running the analyze.py script, written by Kenneth O'Dell Jr.")
+        print("#############################################\n")
+        print("Loading the data...")
         print("Today's date is: ", datetime.now())
         print(f"You have sliced a total of {NUM_DAYS} days")
 
@@ -204,8 +207,10 @@ def loadData():
 
         # Obtain datetimes for each monitor
         # The resulting format should be compatible withn Rethomics in R.
-        time_col = [] # Holds the time columns. But I realize I may not need this at all.
-        date_col = [] # This, too, may be superfluous! But I have it anyways!
+        time_col = (
+            []
+        )  # Holds the time columns. But I realize I may not need this at all.
+        date_col = []  # This, too, may be superfluous! But I have it anyways!
         datetime_index = []
 
         for i, monitor in enumerate(MONITOR_FILES):
@@ -294,11 +299,28 @@ def loadData():
 
             # Exclude animals!
 
+        print("\nData loaded successfully!\n\n\n")
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
 
 # End loadData()
+
+
+# Load data thread. This function will be called when the 'Load data' button is clicked.
+# Since I do not use matplotlib's GUI backend, I can't use the 'plot' function in a separate thread.
+# But I can at least load the data and preprocess it in a separate thread...
+def loadingThread():
+    try:
+        threading.Thread(
+            target=loadData, daemon=True
+        ).start()  # Daemon is false, to avoid abrupt termination when reading/writing files
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+
+
+# End loadingThread
 
 
 # Test function to see current 'loaded' global variables
@@ -307,7 +329,9 @@ def printGlobals():
         print("\n\n\n")
         print("#############################################\n")
         print("Global variables:")
-        print("EXCLUDE_ANIMALS_VAR: ", EXCLUDE_ANIMALS_VAR)
+        print(
+            "EXCLUDE_ANIMALS_VAR: ", str(EXCLUDE_ANIMALS_VAR)
+        )  # display true or false
         print("START_SLICE: ", START_SLICE)
         print("END_SLICE: ", END_SLICE)
         print("MORNING_RAMP_START: ", MORNING_RAMP_START)
@@ -317,12 +341,18 @@ def printGlobals():
         print("RAMP_END_DATE: ", RAMP_END_DATE)
         print("NUM_DAYS: ", NUM_DAYS)
         print("SMOOTHING_WINDOW: ", SMOOTHING_WINDOW)
+
+        print("\n\n")
+
         print("DIR_PATH: ", DIR_PATH)
         print("CLEANED_DATA_PATH: ", CLEANED_DATA_PATH)
         print("RESULT_PATH: ", RESULT_PATH)
         print("SLICED_PATH: ", SLICED_PATH)
         print("EXCLUDE_ANIMALS_PATH: ", EXCLUDE_ANIMALS_PATH)
-        print("exclude_animals_data_path: ", EXCLUDE_ANIMALS_PATH_DATA)
+        print("EXCLUDE_ANIMALS_PATH_DATA: ", EXCLUDE_ANIMALS_PATH_DATA)
+
+        print("\n\n")
+
         print("MONITOR_FILES: ", MONITOR_FILES)
         print("MONITOR_FILE_NAMES: ", MONITOR_FILE_NAMES)
         print("JUST_FILE_NAMES: ", JUST_FILE_NAMES)
@@ -384,7 +414,7 @@ end_time_entry.pack()
 
 DD_start_date_label = tk.Label(
     root,
-    text="Start date for DD analysis (YYYY-MM-DD):",
+    text="Start date for DD analysis (YYYY-MM-DD)\nEnter out-of-bounds date for no DD analysis:",
     font=("sans", font_size, "bold"),
 )
 DD_start_date_label.pack()
@@ -448,7 +478,7 @@ exclude_animals_checkbutton.pack()
 
 # Buttons
 load_button = tk.Button(
-    root, text="Load data", command=loadData, font=("sans", font_size)
+    root, text="Load & Slice data", command=loadingThread, font=("sans", font_size)
 )
 load_button.pack()
 
