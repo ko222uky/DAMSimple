@@ -24,7 +24,7 @@ def drawLD(
     ramp_time=timedelta(hours=3),
     ramp_end_date=datetime.strptime("9999-12-30", "%Y-%m-%d"),
 ):
-    for minute_tick in minute_ticks: # minute_tick is the current datetime in the loop
+    for minute_tick in minute_ticks:  # minute_tick is the current datetime in the loop
         if (
             minute_tick.date() <= ramp_end_date.date()
         ):  # If the date is less than or equal to the ramp_end_date
@@ -102,7 +102,6 @@ def drawLD(
 
 
 def plot_raw(data: pd.DataFrame, i: int, monitor_name: str = "Monitor"):
-
     data.plot(kind="line", legend=False, figsize=(12, 8))  # figsize is in inches
 
     # Create DataFormatter for the x-axis
@@ -248,6 +247,7 @@ def plot_raw_sliced(
 
     plt.tight_layout()
     return plt
+
 
 # Create a figure and a grid of subplots
 def subplots_raw_sliced(

@@ -37,7 +37,7 @@ class TextRedirector(object):
 def loadData():
     try:
         # Declare global variables
-        global EXCLUDE_ANIMALS_VAR
+
         global START_SLICE
         global END_SLICE
         global MORNING_RAMP_START
@@ -62,9 +62,6 @@ def loadData():
         global JUST_FILE_NAMES
 
         global SMOOTHED_MONITORS
-
-        # Define global variables from GUI fields
-        exclude_animals = EXCLUDE_ANIMALS_VAR.get()
 
         START_SLICE = (
             start_time_entry.get()
@@ -120,7 +117,15 @@ def loadData():
             + END_SLICE
         )
         EXCLUDE_ANIMALS_PATH = DIR_PATH + "/excluded_animals"
-        EXCLUDE_ANIMALS_PATH_DATA = EXCLUDE_ANIMALS_PATH + "/excluded_animals_data"
+        EXCLUDE_ANIMALS_PATH_DATA = (
+            EXCLUDE_ANIMALS_PATH
+            + "/excluded_animals_data_"
+            + str(NUM_DAYS)
+            + "_days_"
+            + START_SLICE
+            + "_to_"
+            + END_SLICE
+        )
 
         if not os.path.exists(DIR_PATH):
             os.makedirs(DIR_PATH)
@@ -279,26 +284,6 @@ def loadData():
         # Calculate avg and std for each animal column
         ## make some magic here...
 
-        #################
-        # If animals are to be excluded, we do so here!
-        #################
-        if exclude_animals:
-            # Exclude animals directory
-            if not os.path.exists(EXCLUDE_ANIMALS_PATH):
-                os.makedirs(EXCLUDE_ANIMALS_PATH)
-                print("Created exclude_animals directory")
-            else:
-                print("OK. exclude_animals exists")
-
-            # Exclude animals directory data
-            if not os.path.exists(EXCLUDE_ANIMALS_PATH_DATA):
-                os.makedirs(EXCLUDE_ANIMALS_PATH_DATA)
-                print("Created exclude_animals_data directory")
-            else:
-                print("OK. exclude_animals_data exists")
-
-            # Exclude animals!
-
         print("\nData loaded successfully!\n\n\n")
 
     except Exception as e:
@@ -329,9 +314,6 @@ def printGlobals():
         print("\n\n\n")
         print("#############################################\n")
         print("Global variables:")
-        print(
-            "EXCLUDE_ANIMALS_VAR: ", str(EXCLUDE_ANIMALS_VAR)
-        )  # display true or false
         print("START_SLICE: ", START_SLICE)
         print("END_SLICE: ", END_SLICE)
         print("MORNING_RAMP_START: ", MORNING_RAMP_START)
@@ -358,6 +340,9 @@ def printGlobals():
         print("JUST_FILE_NAMES: ", JUST_FILE_NAMES)
         print("SMOOTHED_MONITORS: ", SMOOTHED_MONITORS)
         print("#############################################\n")
+
+        printExcluded()
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -365,9 +350,109 @@ def printGlobals():
 # End printGlobals
 
 
+def excludableAnimals(monitor_name: str):
+    if monitor_name is None:
+        print("Data file name is not defined. Monitor name is None.")
+        return
+
+    # Create a new Toplevel window
+    options_window = tk.Toplevel(root)
+    options_window.title(f"{monitor_name} Excludable Animals")
+    options_window.geometry("800x1200")
+
+    options_window_label = tk.Label(
+        options_window,
+        text=f"Check boxes to drop that animal from {monitor_name}.",
+        font=("sans", 12, "bold"),
+    )
+    options_window_label.pack()
+
+    animal_vars = []  # Holds the checkbox tkinter variables
+
+    # Create 32 checkboxes
+    for i in range(1, 33):
+        var = tk.BooleanVar()
+        checkbutton = tk.Checkbutton(
+            options_window, text=f"Animal {i}", variable=var, font=("sans", 14)
+        )
+        checkbutton.pack()
+        animal_vars.append(var)
+        # The boolean values are not user-defined until the user actually checks some boxes (or not!)
+        # So I need to obtain the boolean values later, when using them.
+        # For that, I will use a list comprehension to get the boolean values from the checkbox entries
+
+    close_button = tk.Button(
+        options_window, text="Close", command=options_window.destroy
+    )
+    close_button.pack()
+
+    return animal_vars
+
+
+# End excludeAnimals
+
+
+def onExclude():
+    global ANIMALS_TO_EXCLUDE
+
+    #################
+    # If animals are to be excluded, we do so here!
+    #################
+    if EXCLUDE_ANIMALS_VAR.get():
+        # Exclude animals directory
+        if not os.path.exists(EXCLUDE_ANIMALS_PATH):
+            os.makedirs(EXCLUDE_ANIMALS_PATH)
+            print("Created exclude_animals directory")
+        else:
+            print("OK. exclude_animals exists")
+
+        # Exclude animals directory data
+        if not os.path.exists(EXCLUDE_ANIMALS_PATH_DATA):
+            os.makedirs(EXCLUDE_ANIMALS_PATH_DATA)
+            print("Created exclude_animals_data directory")
+        else:
+            print("OK. exclude_animals_data exists")
+
+        # Exclude animals!
+        # If checked, generate and show the options window
+        try:
+            ANIMALS_TO_EXCLUDE = []
+            for monitor_name in JUST_FILE_NAMES:
+                ANIMALS_TO_EXCLUDE.append(excludableAnimals(monitor_name))
+        except Exception as e:
+            print("ERROR: Did you load the data first?")
+    else:
+        print("Re-check to open the exclude animals window.")
+        ANIMALS_TO_EXCLUDE = []
+
+
+# End onExclude
+
+
+def printExcluded():
+    global EXCLUDED_ANIMALS_BOOLS
+
+    print("Excluded animals based on Boolean-slicing:")
+    # Re-initialize the list of boolean values for each animal to exclude
+
+    EXCLUDED_ANIMALS_BOOLS = []
+
+    for i, monitor in enumerate(MONITOR_FILES):
+        # List comprehension to get a list of boolean values from tkinter check variables
+        # The boolean list is then appended to my global list
+        EXCLUDED_ANIMALS_BOOLS.append([var.get() for var in ANIMALS_TO_EXCLUDE[i]])
+        print(
+            f"{JUST_FILE_NAMES[i]}: Excluded animal indices: {monitor.columns[EXCLUDED_ANIMALS_BOOLS[i]]}"
+        )
+    print("\n\n")
+
+
 # Plot raw data. This function will be called when the 'Plot raw' button is clicked.
 def rawPlot():
     try:
+        print("\n\n\n")
+        print("#############################################\n")
+        print("Plotting raw data...")
         t_analyze.rawPlot(
             MONITOR_FILES, JUST_FILE_NAMES, RESULT_PATH
         )  # Add global variables as arguments if needed
@@ -466,7 +551,13 @@ running_average_label.pack()
 running_average_entry = tk.Entry(root, font=("sans", font_size))
 running_average_entry.pack()
 
+load_button = tk.Button(
+    root, text="Load & Slice data", command=loadingThread, font=("sans", font_size)
+)
+load_button.pack()
+
 EXCLUDE_ANIMALS_VAR = tk.BooleanVar()
+EXCLUDE_ANIMALS_VAR.trace_add("write", lambda *args: onExclude())
 exclude_animals_checkbutton = tk.Checkbutton(
     root,
     text="Exclude Animals? Check for 'yes':",
@@ -475,15 +566,8 @@ exclude_animals_checkbutton = tk.Checkbutton(
 )
 exclude_animals_checkbutton.pack()
 
-
-# Buttons
-load_button = tk.Button(
-    root, text="Load & Slice data", command=loadingThread, font=("sans", font_size)
-)
-load_button.pack()
-
 print_globals_button = tk.Button(
-    root, text="Print globals", command=printGlobals, font=("sans", font_size)
+    root, text="Print/check globals", command=printGlobals, font=("sans", font_size)
 )
 print_globals_button.pack()
 
