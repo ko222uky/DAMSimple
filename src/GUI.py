@@ -58,6 +58,7 @@ def loadData():
         global EXCLUDE_ANIMALS_PATH_DATA
 
         global MONITOR_FILES
+        global MONITOR_SLICES
         global MONITOR_FILE_NAMES
         global JUST_FILE_NAMES
 
@@ -250,12 +251,12 @@ def loadData():
             )
 
         # Slice our data
-        monitor_slices = []
+        MONITOR_SLICES = []
         for i, monitor in enumerate(MONITOR_FILES):
             monitor_slice = monitor[
                 (monitor.index >= START_SLICE) & (monitor.index <= END_SLICE)
             ]
-            monitor_slices.append(monitor_slice)
+            MONITOR_SLICES.append(monitor_slice)
             print(f"Sliced data for {JUST_FILE_NAMES[i]}")
             print(
                 f"Saved sliced data to {SLICED_PATH + '/sliced_data' + f'/sliced_{JUST_FILE_NAMES[i]}' }"
@@ -269,7 +270,7 @@ def loadData():
             []
         )  # Holds the smoothed data for each monitor, as PandasData frames
 
-        for i, monitor in enumerate(monitor_slices):
+        for i, monitor in enumerate(MONITOR_SLICES):
             smoothed_monitor = pd.DataFrame()
             for column in monitor.columns:
                 smoothed_monitor[column + "_run_avg_" + str(SMOOTHING_WINDOW)] = (
@@ -429,21 +430,56 @@ def onExclude():
 # End onExclude
 
 
+# This function also commits the exclusions defined in the check boxes. It saves the excluded animals data file.
 def printExcluded():
     global EXCLUDED_ANIMALS_BOOLS
+    global EXCLUDED_ANIMALS_MONITOR_FILES  # List of pd.DataFrames for future plotting
+
+    global EXCLUDED_DIR_LIST
+    excl_str = "/excluded"
+
+    EXCLUDED_ANIMALS_BOOLS = []
+    EXCLUDED_ANIMALS_MONITOR_FILES = []
 
     print("Excluded animals based on Boolean-slicing:")
     # Re-initialize the list of boolean values for each animal to exclude
 
-    EXCLUDED_ANIMALS_BOOLS = []
-
-    for i, monitor in enumerate(MONITOR_FILES):
+    for i, slice in enumerate(MONITOR_SLICES):
         # List comprehension to get a list of boolean values from tkinter check variables
         # The boolean list is then appended to my global list
         EXCLUDED_ANIMALS_BOOLS.append([var.get() for var in ANIMALS_TO_EXCLUDE[i]])
+        excluded_animal_columns = slice.columns[EXCLUDED_ANIMALS_BOOLS[i]]
         print(
-            f"{JUST_FILE_NAMES[i]}: Excluded animal indices: {monitor.columns[EXCLUDED_ANIMALS_BOOLS[i]]}"
+            f"{JUST_FILE_NAMES[i]}: Excluded animal indices: {excluded_animal_columns}"
         )
+
+        # Concatenate the animal numbers to a string, which will be used to create a specific directory.
+        # This lets us make multiple unique exclusions while saving the data.
+        # And each exclusion is saved to a specific directory, for identification purposes.
+        for j, bool in enumerate(EXCLUDED_ANIMALS_BOOLS[i]):
+            if bool:
+                excl_str += "_" + str(j + 1)
+
+        if not os.path.exists(EXCLUDE_ANIMALS_PATH_DATA + excl_str):
+            os.makedirs(EXCLUDE_ANIMALS_PATH_DATA + excl_str)
+            print("Created specific directory based on excluded animals")
+        else:
+            print(
+                "OK. Looks like we've sliced these same individuals before. Directory exists"
+            )
+
+        # Save the excluded animals to a file
+        EXCLUDED_ANIMALS_MONITOR_FILES.append(
+            slice.drop(columns=excluded_animal_columns)
+        )
+        EXCLUDED_ANIMALS_MONITOR_FILES[i].to_csv(
+            EXCLUDE_ANIMALS_PATH_DATA + excl_str + "/excluded_" + JUST_FILE_NAMES[i],
+            sep="\t",
+        )
+        print(
+            f"Excluded animals saved to {EXCLUDE_ANIMALS_PATH_DATA + excl_str + '/excluded_' + JUST_FILE_NAMES[i]}"
+        )
+
     print("\n\n")
 
 
@@ -567,7 +603,10 @@ exclude_animals_checkbutton = tk.Checkbutton(
 exclude_animals_checkbutton.pack()
 
 print_globals_button = tk.Button(
-    root, text="Print/check globals", command=printGlobals, font=("sans", font_size)
+    root,
+    text="Print globals and commit exclusions",
+    command=printGlobals,
+    font=("sans", font_size),
 )
 print_globals_button.pack()
 
