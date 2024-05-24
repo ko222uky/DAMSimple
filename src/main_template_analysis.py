@@ -518,7 +518,7 @@ def slicedPlot(
         )
         plt.close()
         print(
-            f"Saved raw data plot to {sliced_path + '/fig_03/' + just_file_names[i].replace('.txt', '') + '_raw_sliced_data_fig_03.png'}"
+            f"Saved sliced raw data plot to {sliced_path + '/fig_03/' + just_file_names[i].replace('.txt', '') + '_raw_sliced_data_fig_03.png'}"
         )
 
 
@@ -534,7 +534,6 @@ def slicedIndividualPlot(
     evening_ramp_end: dt_time,
     ramp_time: timedelta,
     ramp_end_date: datetime,
-    smoothing_window: int,
 ):
     #################
     # Subplots of SLICED raw data for each animal

@@ -302,7 +302,6 @@ def loadData():
         )  # Holds the smoothed data for each monitor, as PandasData frames
 
         for i, monitor in enumerate(MONITOR_SLICES):
-
             # We define a FixedForwardWindowIndexer to calculate the forward looking moving average
             # This is slightly different than the default moving average, which is backward looking and excludes the first range of values by leaving them blank.
             indexer = pd.api.indexers.FixedForwardWindowIndexer(
@@ -558,6 +557,7 @@ def printExcluded():
 
     print("\n\n")
 
+# Plot functions
 
 # Plot raw data. This function will be called when the 'Plot raw' button is clicked.
 def rawPlot():
@@ -568,8 +568,47 @@ def rawPlot():
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
+# Plot raw sliced for all
+def slicedPlot():
+    try:
+        t_analyze.slicedPlot(
+            MONITOR_SLICES,
+            JUST_FILE_NAMES,
+            SLICED_PATH,
+            START_SLICE,
+            END_SLICE,
+            NUM_DAYS,
+            MORNING_RAMP_START,
+            EVENING_RAMP_START,
+            EVENING_RAMP_END,
+            RAMP_TIME,
+            RAMP_END_DATE,
+        )  # Add global variables as arguments if needed
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
 
-# End plotRaw
+# Plot raw sliced for individuals
+def slicedIndividualPlot():
+    try:
+        t_analyze.slicedIndividualPlot(
+            MONITOR_SLICES,
+            JUST_FILE_NAMES,
+            SLICED_PATH,
+            START_SLICE,
+            END_SLICE,
+            NUM_DAYS,
+            MORNING_RAMP_START,
+            EVENING_RAMP_START,
+            EVENING_RAMP_END,
+            RAMP_TIME,
+            RAMP_END_DATE,
+        )  # Add global variables as arguments if neede
+        # Add global variables as arguments if needed
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+
+
+
 
 
 # Main GUI
@@ -736,12 +775,65 @@ print_globals_button = tk.Button(
 print_globals_button.pack()
 all_widgets.append(print_globals_button)
 
+# BUTTONS FOR PLOTTING
+# Create a separate frame for the buttons, so I can use a grid layout
+button_frame = tk.Frame(root)
+button_frame.configure(bg="#90EE90")
+button_frame.pack()
+button_frame_label = tk.Label(button_frame, text="Plotting options", font=("sans", font_size, "bold"))
+button_frame_label.grid(row=0, column=0, columnspan=3)
+all_widgets.append(button_frame_label)
+
+
 # Plot raw data
-plot_raw_button = tk.Button(
-    root, text="Plot raw", command=rawPlot, font=("sans", font_size)
+plot_raw_button_label = tk.Label(
+    button_frame, text="Fig. 1 & 2", font=("sans", font_size)
 )
-plot_raw_button.pack()
+plot_raw_button_label.grid(row=1, column=0)
+all_widgets.append(plot_raw_button_label)
+
+plot_raw_button = tk.Button(
+    button_frame, text="Raw data", command=rawPlot, font=("sans", font_size)
+)
+plot_raw_button.grid(row=2, column=0)
 all_widgets.append(plot_raw_button)
+
+# Plot sliced
+plot_sliced_button_label = tk.Label(
+    button_frame, text="Fig. 3", font=("sans", font_size)
+)
+plot_sliced_button_label.grid(row=1, column=1)
+all_widgets.append(plot_sliced_button_label)
+
+plot_sliced_button = tk.Button(
+    button_frame,
+    text="Sliced all",
+    command=slicedPlot,
+    font=("sans", font_size),
+)
+plot_sliced_button.grid(row=2, column=1)
+all_widgets.append(plot_sliced_button)
+
+# Plot sliced for individuals
+plot_sliced_individual_button_label = tk.Label(
+    button_frame, text="Fig. 4", font=("sans", font_size)
+)
+plot_sliced_individual_button_label.grid(row=1, column=2)
+all_widgets.append(plot_sliced_individual_button_label)
+
+plot_sliced_individual_button = tk.Button(
+    button_frame,
+    text="Sliced subplots",
+    command=slicedIndividualPlot,
+    font=("sans", font_size),
+)
+plot_sliced_individual_button.grid(row=2, column=2)
+all_widgets.append(plot_sliced_individual_button)
+
+
+
+
+
 
 
 # scale output text
