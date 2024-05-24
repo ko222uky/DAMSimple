@@ -1,7 +1,5 @@
-/raw-data
-/src/__pycache__
+# For when I was testing some of the visualizations in Jupyter notebooks
+src/*.ipynb
 
-data-wrangling/*.ipynb
-data-wrangling/log.txt
-data-wrangling/__pycache__/
-data-wrangling/__pycache__
+src/log.txt
+src/__pycache__

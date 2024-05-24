@@ -1,6 +1,7 @@
 # tkinter for GUI
 import tkinter as tk
 from tkinter import ttk  # access to the Tk themed widget set
+from tkinter import ttk  # access to the Tk themed widget set
 from tkinter import messagebox
 
 import threading
@@ -8,9 +9,11 @@ import threading
 import os
 import glob
 import sys  # For outputting stoud to the text widget
+import sys  # For outputting stoud to the text widget
 
 import pandas as pd
 
+# import matplotlib.dates as mdates
 # import matplotlib.dates as mdates
 from datetime import datetime, timedelta
 from datetime import time as dt_time
@@ -33,6 +36,20 @@ class TextRedirector(object):
         pass  # This is needed for the file-like object.
 
 
+# Functions to resize elements in the GUI
+def resize_output_text(scale_value):
+    # Update the font size based on the scale value
+    output_text.config(font=("TkDefaultFont", int(scale_value)))
+
+
+def update_font_size(scale_value):
+    # Update the font size based on the scale value
+    global font_size
+    font_size = int(scale_value)
+    for widget in all_widgets:
+        widget.config(font=("sans", font_size))
+
+
 # Global variables are defined with this via user entries in the appropriate fields.
 def loadData():
     try:
@@ -51,11 +68,12 @@ def loadData():
         global SMOOTHING_WINDOW
 
         global DIR_PATH
-        global CLEANED_DATA_PATH
-        global RESULT_PATH
+        global PREPARED_DATA_PATH
+        global PREPARED_PATH
         global SLICED_PATH
         global EXCLUDE_ANIMALS_PATH
         global EXCLUDE_ANIMALS_PATH_DATA
+        global SMOOTHED_DIR_PATH
 
         global MONITOR_FILES
         global MONITOR_SLICES
@@ -63,6 +81,9 @@ def loadData():
         global JUST_FILE_NAMES
 
         global SMOOTHED_MONITORS
+
+        # Define global variables from GUI fields
+        exclude_animals = EXCLUDE_ANIMALS_VAR.get()
 
         START_SLICE = (
             start_time_entry.get()
@@ -106,16 +127,18 @@ def loadData():
         # Create directories, if they don't exist.
         # I realized I could've used the Pathlib library for this, but I'm new to Python, haha.
         DIR_PATH = "../" + directory_entry.get()
-        CLEANED_DATA_PATH = DIR_PATH + "/cleaned_data_all_animals"
-        RESULT_PATH = DIR_PATH + "/results_pre_sliced_all_animals"
+        PREPARED_DATA_PATH = DIR_PATH + "/prepared_data_raw_all_animals/prepared_data"
+        PREPARED_PATH = DIR_PATH + "/prepared_data_raw_all_animals"
         SLICED_PATH = (
             DIR_PATH
             + "/sliced_data_all_animals_"
             + str(NUM_DAYS)
             + "_days_"
-            + START_SLICE
+            + START_SLICE.replace(
+                ":", "-"
+            )  # So Windows doesn't throw a fit because of their beloved :C drive
             + "_to_"
-            + END_SLICE
+            + END_SLICE.replace(":", "-")
         )
         EXCLUDE_ANIMALS_PATH = DIR_PATH + "/excluded_animals"
         EXCLUDE_ANIMALS_PATH_DATA = (
@@ -123,10 +146,11 @@ def loadData():
             + "/excluded_animals_data_"
             + str(NUM_DAYS)
             + "_days_"
-            + START_SLICE
+            + START_SLICE.replace(":", "-")
             + "_to_"
-            + END_SLICE
+            + END_SLICE.replace(":", "-")
         )
+        SMOOTHED_DIR_PATH = SLICED_PATH + "/smoothed_data"
 
         if not os.path.exists(DIR_PATH):
             os.makedirs(DIR_PATH)
@@ -134,17 +158,17 @@ def loadData():
         else:
             print("OK. Directory exists: ", DIR_PATH)
 
-        if not os.path.exists(CLEANED_DATA_PATH):
-            os.makedirs(CLEANED_DATA_PATH)
-            print("Cleaned data directory created: ", CLEANED_DATA_PATH)
+        if not os.path.exists(PREPARED_DATA_PATH):
+            os.makedirs(PREPARED_DATA_PATH)
+            print("Prepared data directory created: ", PREPARED_DATA_PATH)
         else:
-            print("OK. Cleaned data directory exists: ", CLEANED_DATA_PATH)
+            print("OK. Prepared data directory exists: ", PREPARED_DATA_PATH)
 
-        if not os.path.exists(RESULT_PATH):
-            os.makedirs(RESULT_PATH)
-            print("Results created: ", RESULT_PATH)
+        if not os.path.exists(PREPARED_PATH):
+            os.makedirs(PREPARED_PATH)
+            print("Results created: ", PREPARED_PATH)
         else:
-            print("OK. Results exists: ", RESULT_PATH)
+            print("OK. Results exists: ", PREPARED_PATH)
 
         # Sliced data range
         if not os.path.exists(SLICED_PATH):
@@ -160,15 +184,22 @@ def loadData():
         else:
             print("OK. Sliced data directory exists: ", SLICED_PATH + "/sliced_data")
 
+        # Smoothed data directory
+        if not os.path.exists(SMOOTHED_DIR_PATH):
+            os.makedirs(SMOOTHED_DIR_PATH)
+            print("Smoothed data directory created: ", SMOOTHED_DIR_PATH)
+        else:
+            print("OK. Smoothed data directory exists: ", SMOOTHED_DIR_PATH)
+
         # figure directories
-        if not os.path.exists(RESULT_PATH + "/fig_01"):
-            os.makedirs(RESULT_PATH + "/fig_01")
+        if not os.path.exists(PREPARED_PATH + "/fig_01"):
+            os.makedirs(PREPARED_PATH + "/fig_01")
             print("Created fig_01 directory")
         else:
             print("OK. fig_01 exists")
 
-        if not os.path.exists(RESULT_PATH + "/fig_02"):
-            os.makedirs(RESULT_PATH + "/fig_02")
+        if not os.path.exists(PREPARED_PATH + "/fig_02"):
+            os.makedirs(PREPARED_PATH + "/fig_02")
             print("Created fig_02 directory")
         else:
             print("OK. fig_02 exists")
@@ -243,11 +274,11 @@ def loadData():
             MONITOR_FILES[i] = activity  # update the monitor df in our list
 
             activity.to_csv(
-                CLEANED_DATA_PATH + f"/cleaned_{JUST_FILE_NAMES[i]}", sep="\t"
+                PREPARED_DATA_PATH + f"/prepared_{JUST_FILE_NAMES[i]}", sep="\t"
             )
-            print(f"Cleaned data for {JUST_FILE_NAMES[i]}")
+            print(f"Prepared data for {JUST_FILE_NAMES[i]}")
             print(
-                f"Saved cleaned data to {CLEANED_DATA_PATH + '/cleaned_' + JUST_FILE_NAMES[i]}"
+                f"Saved prepared data to {PREPARED_DATA_PATH + '/prepared_' + JUST_FILE_NAMES[i]}"
             )
 
         # Slice our data
@@ -271,13 +302,52 @@ def loadData():
         )  # Holds the smoothed data for each monitor, as PandasData frames
 
         for i, monitor in enumerate(MONITOR_SLICES):
+
+            # We define a FixedForwardWindowIndexer to calculate the forward looking moving average
+            # This is slightly different than the default moving average, which is backward looking and excludes the first range of values by leaving them blank.
+            indexer = pd.api.indexers.FixedForwardWindowIndexer(
+                window_size=SMOOTHING_WINDOW
+            )
+
             smoothed_monitor = pd.DataFrame()
+
+            # Let's create a df to hold basic statistics...mean and std
+            average_and_std = pd.DataFrame(
+                columns=monitor.columns, index=["mean", "std"]
+            )
+            average_and_std.index.name = "statistic"
+
             for column in monitor.columns:
-                smoothed_monitor[column + "_run_avg_" + str(SMOOTHING_WINDOW)] = (
-                    monitor[column].rolling(window=SMOOTHING_WINDOW).mean()
+                smoothed_column_name = column + "_run_avg_" + str(SMOOTHING_WINDOW)
+                smoothed_monitor[smoothed_column_name] = (
+                    monitor[column].rolling(window=indexer, min_periods=1).mean()
                 )  # Change this to a forward looking moving average
+
+                # Let's also calculate average and std here.
+                # Note that avg and std are calculated from the SMOOTHED data.
+                average_and_std.loc["mean", column] = smoothed_monitor[
+                    smoothed_column_name
+                ].mean()
+                average_and_std.loc["std", column] = smoothed_monitor[
+                    smoothed_column_name
+                ].std()
+
             smoothed_monitor.index = monitor.index
+            smoothed_monitor.to_csv(
+                SMOOTHED_DIR_PATH
+                + f"/smoothed_"
+                + str(SMOOTHING_WINDOW)
+                + "min_"
+                + JUST_FILE_NAMES[i],
+                sep="\t",
+            )
+
+            average_and_std.to_csv(
+                SMOOTHED_DIR_PATH + f"/column_average_and_std_" + JUST_FILE_NAMES[i],
+                sep="\t",
+            )
             SMOOTHED_MONITORS.append(smoothed_monitor)
+
             print(
                 f"Calculated running average of {SMOOTHING_WINDOW} min for {JUST_FILE_NAMES[i]}"
             )
@@ -328,8 +398,8 @@ def printGlobals():
         print("\n\n")
 
         print("DIR_PATH: ", DIR_PATH)
-        print("CLEANED_DATA_PATH: ", CLEANED_DATA_PATH)
-        print("RESULT_PATH: ", RESULT_PATH)
+        print("PREPARED_DATA_PATH: ", PREPARED_DATA_PATH)
+        print("PREPARED_PATH: ", PREPARED_PATH)
         print("SLICED_PATH: ", SLICED_PATH)
         print("EXCLUDE_ANIMALS_PATH: ", EXCLUDE_ANIMALS_PATH)
         print("EXCLUDE_ANIMALS_PATH_DATA: ", EXCLUDE_ANIMALS_PATH_DATA)
@@ -364,8 +434,9 @@ def excludableAnimals(monitor_name: str):
     options_window_label = tk.Label(
         options_window,
         text=f"Check boxes to drop that animal from {monitor_name}.",
-        font=("sans", 12, "bold"),
+        font=("sans", font_size, "bold"),
     )
+    options_window.configure(bg="#90EE90")
     options_window_label.pack()
 
     animal_vars = []  # Holds the checkbox tkinter variables
@@ -374,17 +445,23 @@ def excludableAnimals(monitor_name: str):
     for i in range(1, 33):
         var = tk.BooleanVar()
         checkbutton = tk.Checkbutton(
-            options_window, text=f"Animal {i}", variable=var, font=("sans", 14)
+            options_window, text=f"Animal {i}", variable=var, font=("sans", font_size)
         )
         checkbutton.pack()
+        checkbutton.configure(bg="#90EE90", border=5, relief="raised", cursor="hand2")
+
         animal_vars.append(var)
         # The boolean values are not user-defined until the user actually checks some boxes (or not!)
         # So I need to obtain the boolean values later, when using them.
         # For that, I will use a list comprehension to get the boolean values from the checkbox entries
 
     close_button = tk.Button(
-        options_window, text="Close", command=options_window.destroy
+        options_window,
+        text="Close",
+        command=options_window.destroy,
+        font=("sans", font_size),
     )
+    close_button.configure(bg="#00FF7F", border=5, relief="raised", cursor="hand2")
     close_button.pack()
 
     return animal_vars
@@ -435,7 +512,6 @@ def printExcluded():
     global EXCLUDED_ANIMALS_BOOLS
     global EXCLUDED_ANIMALS_MONITOR_FILES  # List of pd.DataFrames for future plotting
 
-    global EXCLUDED_DIR_LIST
     excl_str = "/excluded"
 
     EXCLUDED_ANIMALS_BOOLS = []
@@ -486,11 +562,8 @@ def printExcluded():
 # Plot raw data. This function will be called when the 'Plot raw' button is clicked.
 def rawPlot():
     try:
-        print("\n\n\n")
-        print("#############################################\n")
-        print("Plotting raw data...")
         t_analyze.rawPlot(
-            MONITOR_FILES, JUST_FILE_NAMES, RESULT_PATH
+            MONITOR_FILES, JUST_FILE_NAMES, PREPARED_PATH
         )  # Add global variables as arguments if needed
     except Exception as e:
         messagebox.showerror("Error", str(e))
@@ -501,10 +574,36 @@ def rawPlot():
 
 # Main GUI
 root = tk.Tk()
-root.title("Damn Simple: A GUI for Simple Visualization of DAM Data")
-root.geometry("1000x800")
-
+root.configure(bg="#90EE90", bd=25, relief="ridge", cursor="arrow")
+all_widgets = []
 font_size = 14
+
+# Create a scale widget for the font size
+fontsize_scale_label = tk.Label(
+    root,
+    text="Slider to adjust font size",
+    font=("sans", font_size, "bold"),
+)
+fontsize_scale_label.pack()
+all_widgets.append(fontsize_scale_label)
+
+font_scale_widget = tk.Scale(
+    root,
+    from_=10,
+    to=60,
+    orient="horizontal",
+    length=1000,
+    sliderlength=50,
+    width=50,
+    command=update_font_size,
+    font=("sans", font_size, "bold"),
+)
+font_scale_widget.pack()
+all_widgets.append(font_scale_widget)
+
+root.title("Damn Simple: A GUI for Simple Visualization of DAM Data")
+root.geometry("1200x1200")
+
 
 directory_label = tk.Label(
     root,
@@ -514,6 +613,8 @@ directory_label = tk.Label(
 directory_label.pack()
 directory_entry = tk.Entry(root, font=("sans", font_size))
 directory_entry.pack()
+all_widgets.append(directory_label)
+all_widgets.append(directory_entry)
 
 start_time_label = tk.Label(
     root,
@@ -523,6 +624,8 @@ start_time_label = tk.Label(
 start_time_label.pack()
 start_time_entry = tk.Entry(root, font=("sans", font_size))
 start_time_entry.pack()
+all_widgets.append(start_time_label)
+all_widgets.append(start_time_entry)
 
 end_time_label = tk.Label(
     root,
@@ -532,6 +635,8 @@ end_time_label = tk.Label(
 end_time_label.pack()
 end_time_entry = tk.Entry(root, font=("sans", font_size))
 end_time_entry.pack()
+all_widgets.append(end_time_label)
+all_widgets.append(end_time_entry)
 
 DD_start_date_label = tk.Label(
     root,
@@ -541,6 +646,8 @@ DD_start_date_label = tk.Label(
 DD_start_date_label.pack()
 DD_start_date_entry = tk.Entry(root, font=("sans", font_size))
 DD_start_date_entry.pack()
+all_widgets.append(DD_start_date_label)
+all_widgets.append(DD_start_date_entry)
 
 morning_ramp_label = tk.Label(
     root,
@@ -550,6 +657,8 @@ morning_ramp_label = tk.Label(
 morning_ramp_label.pack()
 morning_ramp_entry = tk.Entry(root, font=("sans", font_size))
 morning_ramp_entry.pack()
+all_widgets.append(morning_ramp_label)
+all_widgets.append(morning_ramp_entry)
 
 evening_ramp_label = tk.Label(
     root,
@@ -559,6 +668,8 @@ evening_ramp_label = tk.Label(
 evening_ramp_label.pack()
 evening_ramp_entry = tk.Entry(root, font=("sans", font_size))
 evening_ramp_entry.pack()
+all_widgets.append(evening_ramp_label)
+all_widgets.append(evening_ramp_entry)
 
 night_start_label = tk.Label(
     root,
@@ -568,6 +679,8 @@ night_start_label = tk.Label(
 night_start_label.pack()
 night_start_entry = tk.Entry(root, font=("sans", font_size))
 night_start_entry.pack()
+all_widgets.append(night_start_label)
+all_widgets.append(night_start_entry)
 
 ramp_duration_label = tk.Label(
     root,
@@ -577,6 +690,8 @@ ramp_duration_label = tk.Label(
 ramp_duration_label.pack()
 ramp_duration_entry = tk.Entry(root, font=("sans", font_size))
 ramp_duration_entry.pack()
+all_widgets.append(ramp_duration_label)
+all_widgets.append(ramp_duration_entry)
 
 running_average_label = tk.Label(
     root,
@@ -584,14 +699,21 @@ running_average_label = tk.Label(
     font=("sans", font_size, "bold"),
 )
 running_average_label.pack()
+all_widgets.append(running_average_label)
+
 running_average_entry = tk.Entry(root, font=("sans", font_size))
 running_average_entry.pack()
+all_widgets.append(running_average_entry)
 
+# Buttons
+# Load the data and set major global variables
 load_button = tk.Button(
-    root, text="Load & Slice data", command=loadingThread, font=("sans", font_size)
+    root, text="Load data", command=loadData, font=("sans", font_size)
 )
 load_button.pack()
+all_widgets.append(load_button)
 
+# Define excluded animals
 EXCLUDE_ANIMALS_VAR = tk.BooleanVar()
 EXCLUDE_ANIMALS_VAR.trace_add("write", lambda *args: onExclude())
 exclude_animals_checkbutton = tk.Checkbutton(
@@ -601,7 +723,10 @@ exclude_animals_checkbutton = tk.Checkbutton(
     font=("sans", font_size),
 )
 exclude_animals_checkbutton.pack()
+all_widgets.append(exclude_animals_checkbutton)
+all_widgets.append(exclude_animals_checkbutton)
 
+# Commit the exclusions, if any. Print globals to verify correctness and the exclusions.
 print_globals_button = tk.Button(
     root,
     text="Print globals and commit exclusions",
@@ -609,16 +734,46 @@ print_globals_button = tk.Button(
     font=("sans", font_size),
 )
 print_globals_button.pack()
+all_widgets.append(print_globals_button)
 
+# Plot raw data
 plot_raw_button = tk.Button(
     root, text="Plot raw", command=rawPlot, font=("sans", font_size)
 )
 plot_raw_button.pack()
+all_widgets.append(plot_raw_button)
 
+
+# scale output text
+scale_output_label = tk.Label(
+    root,
+    text="Output Text",
+    font=("sans", font_size, "bold"),
+)
+scale_output_label.pack()
+all_widgets.append(scale_output_label)
+
+scale_output_text = tk.Scale(
+    root, from_=10, to=30, length=1000, orient="horizontal", command=resize_output_text
+)
+scale_output_text.pack()
+all_widgets.append(scale_output_text)
+
+# output text widget
 output_text = tk.Text(root, width=100, height=30, wrap=tk.WORD, font=("sans", 12))
 output_text.pack()
 
 # Redirect the stdout to the text widget
 sys.stdout = TextRedirector(output_text)
+
+# Other formatting for my widgets
+for widget in all_widgets:
+    if isinstance(widget, tk.Button) or isinstance(widget, tk.Checkbutton):
+        widget.configure(bg="#00FF7F", border=5, relief="raised", cursor="hand2")
+    elif isinstance(widget, tk.Label):
+        widget.configure(bg="#90EE90")
+    elif isinstance(widget, tk.Scale):
+        widget.configure(bg="#90EE90", bd=5, relief="ridge", cursor="hand2")
+
 
 root.mainloop()
