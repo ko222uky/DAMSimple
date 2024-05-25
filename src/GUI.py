@@ -49,11 +49,19 @@ def update_font_size(scale_value):
     for widget in all_widgets:
         widget.config(font=("sans", font_size))
 
+def processData():
+    # Process data, from RUNNING AVG to FINAL GRAPH
+    pass
+
 
 # Global variables are defined with this via user entries in the appropriate fields.
+# This also processes the monitor data (prepared, sliced, smoothed, etc...)
 def loadData():
     try:
         # Declare global variables
+        global RECORDING_INTERVAL
+        RECORDING_INTERVAL = 1  # 1 minute recording interval, which is the default.
+                                # I may let the user change this in the future
 
         global START_SLICE
         global END_SLICE
@@ -74,6 +82,8 @@ def loadData():
         global EXCLUDE_ANIMALS_PATH
         global EXCLUDE_ANIMALS_PATH_DATA
         global SMOOTHED_DIR_PATH
+        global Z_SCORED_PATH
+        global FOLDED_AVERAGE_PATH
 
         global MONITOR_FILES
         global MONITOR_SLICES
@@ -81,6 +91,12 @@ def loadData():
         global JUST_FILE_NAMES
 
         global SMOOTHED_MONITORS
+
+        global AVG_AND_STD
+        global ZSCORED_MONITORS
+
+        global FOLDED_AVG_MONITORS
+
 
         # Define global variables from GUI fields
         exclude_animals = EXCLUDE_ANIMALS_VAR.get()
@@ -151,6 +167,9 @@ def loadData():
             + END_SLICE.replace(":", "-")
         )
         SMOOTHED_DIR_PATH = SLICED_PATH + "/smoothed_data"
+        Z_SCORED_PATH = SLICED_PATH + "/z_scored_data"
+        FOLDED_AVERAGE_PATH = SLICED_PATH + "/folded_average_data"
+   
 
         if not os.path.exists(DIR_PATH):
             os.makedirs(DIR_PATH)
@@ -191,6 +210,20 @@ def loadData():
         else:
             print("OK. Smoothed data directory exists: ", SMOOTHED_DIR_PATH)
 
+        # Z-scored data directory
+        if not os.path.exists(Z_SCORED_PATH):
+            os.makedirs(Z_SCORED_PATH)
+            print("Z-scored data directory created: ", Z_SCORED_PATH)
+        else:
+            print("OK. Z-scored data directory exists: ", Z_SCORED_PATH)
+
+        # Folded average data directory
+        if not os.path.exists(FOLDED_AVERAGE_PATH):
+            os.makedirs(FOLDED_AVERAGE_PATH)
+            print("Folded average data directory created: ", FOLDED_AVERAGE_PATH)
+        else:
+            print("OK. Folded average data directory exists: ", FOLDED_AVERAGE_PATH)
+
         # figure directories
         if not os.path.exists(PREPARED_PATH + "/fig_01"):
             os.makedirs(PREPARED_PATH + "/fig_01")
@@ -221,6 +254,24 @@ def loadData():
             print("Created fig_05 directory")
         else:
             print("OK. fig_05 exists")
+
+        if not os.path.exists(SLICED_PATH + "/fig_06"):
+            os.makedirs(SLICED_PATH + "/fig_06")
+            print("Created fig_06 directory")
+        else:
+            print("OK. fig_06 exists")
+
+        if not os.path.exists(SLICED_PATH + "/fig_07"):
+            os.makedirs(SLICED_PATH + "/fig_07")
+            print("Created fig_07 directory")
+        else:
+            print("OK. fig_07 exists")
+
+        if not os.path.exists(SLICED_PATH + "/fig_08"):
+            os.makedirs(SLICED_PATH + "/fig_08")
+            print("Created fig_08 directory")
+        else:
+            print("OK. fig_08 exists")
 
         ###################################################
         ################ READ IN THE DATA #################
@@ -269,6 +320,7 @@ def loadData():
         for i, monitor in enumerate(MONITOR_FILES):
             activity = monitor.iloc[:, 10:42]
             activity.index = datetime_index[i]
+            activity.index.name = "datetime"
             activity.columns = animal_nums
 
             MONITOR_FILES[i] = activity  # update the monitor df in our list
@@ -296,6 +348,7 @@ def loadData():
                 SLICED_PATH + "/sliced_data" + f"/sliced_{JUST_FILE_NAMES[i]}", sep="\t"
             )
 
+        # THIS NEXT SECTION MAY BE PLACED INTO A SEPARATE FUNCTION FOR REUSABILITY
         # Calculate running average (in minutes) for each animal column
         SMOOTHED_MONITORS = (
             []
@@ -311,10 +364,8 @@ def loadData():
             smoothed_monitor = pd.DataFrame()
 
             # Let's create a df to hold basic statistics...mean and std
-            average_and_std = pd.DataFrame(
-                columns=monitor.columns, index=["mean", "std"]
-            )
-            average_and_std.index.name = "statistic"
+            AVG_AND_STD = pd.DataFrame(columns=monitor.columns, index=["mean", "std"])
+            AVG_AND_STD.index.name = "statistic"
 
             for column in monitor.columns:
                 smoothed_column_name = column + "_run_avg_" + str(SMOOTHING_WINDOW)
@@ -324,10 +375,10 @@ def loadData():
 
                 # Let's also calculate average and std here.
                 # Note that avg and std are calculated from the SMOOTHED data.
-                average_and_std.loc["mean", column] = smoothed_monitor[
+                AVG_AND_STD.loc["mean", column] = smoothed_monitor[
                     smoothed_column_name
                 ].mean()
-                average_and_std.loc["std", column] = smoothed_monitor[
+                AVG_AND_STD.loc["std", column] = smoothed_monitor[
                     smoothed_column_name
                 ].std()
 
@@ -341,7 +392,7 @@ def loadData():
                 sep="\t",
             )
 
-            average_and_std.to_csv(
+            AVG_AND_STD.to_csv(
                 SMOOTHED_DIR_PATH + f"/column_average_and_std_" + JUST_FILE_NAMES[i],
                 sep="\t",
             )
@@ -352,6 +403,62 @@ def loadData():
             )
 
         # Calculate avg and std for each animal column
+        print("\n\n")
+        print("Converting smoothed values to z-score...")
+        ZSCORED_MONITORS = []
+        for i, smoothed_monitor in enumerate(
+            SMOOTHED_MONITORS
+        ):  # We will use the smoothed data to calculate z-scores
+
+            # I define the zscored_monitor to have the original column names (e.g., 'animal_1', 'animal_2', etc.)
+            # It will use the smoothed_monitor index, which is the datetime index. Any of the sliced indices would work.
+            # Define our zscored_monitor
+            zscored_monitor = pd.DataFrame(
+                columns=MONITOR_FILES[i].columns, index=smoothed_monitor.index
+            )
+
+            for j, column in enumerate(zscored_monitor.columns):
+                # Now, for each column in the zscored_monitor, I will assign it to a column of z-scores
+                # which are calculated from the smoothed_monitor files.
+                # I will use the mean and std from the AVG_AND_STD df to calculate the z-scores.
+                zscored_monitor[column] = smoothed_monitor.iloc[:, j].apply(
+                    lambda x: (x - AVG_AND_STD.loc["mean", column])
+                    / AVG_AND_STD.loc["std", column]
+                )
+
+            ZSCORED_MONITORS.append(zscored_monitor)
+            zscored_monitor.to_csv(
+                Z_SCORED_PATH
+                + f"/zscored_{SMOOTHING_WINDOW}_min_run_avg_{JUST_FILE_NAMES[i]}",
+                sep="\t",
+            )
+            print(
+                f"Saved z-scored data to {Z_SCORED_PATH + f'/zscored_{SMOOTHING_WINDOW}_min_run_avg_{JUST_FILE_NAMES[i]}' }"
+            )
+
+        print("\n\n")
+        
+        # Calculate the folded average
+        print("Calculating the folded average...")
+        FOLDED_AVG_MONITORS = []
+
+        for i, zscored_monitor in enumerate(ZSCORED_MONITORS):
+            # New folded_avg_monitor will have indices up to 24 hrs. Here, since the index is in minutes, we will have 1440 minutes in a day + 1,...
+            # so that the index goes from 00:00 to 00:00 the next day.
+            folded_avg_monitor = pd.DataFrame(columns = zscored_monitor.columns)
+            folded_avg_monitor.index.name = "time_bin"
+            for column in zscored_monitor:
+                # Fold the data. We can group by the datetime's time, and then calculate the mean for each time.
+                folded_avg_monitor[column] = zscored_monitor[column].groupby(zscored_monitor.index.time).mean()
+
+            folded_avg_monitor = folded_avg_monitor.append(folded_avg_monitor.iloc[1,:]) # Append the first row to the end to make the plot look nice
+            FOLDED_AVG_MONITORS.append(folded_avg_monitor)
+            folded_avg_monitor.to_csv(FOLDED_AVERAGE_PATH + f"/folded_avg_{JUST_FILE_NAMES[i]}", sep="\t")
+            print(f"Saved folded average data to {FOLDED_AVERAGE_PATH + f'/folded_avg_{JUST_FILE_NAMES[i]}' }")
+            
+
+
+
         ## make some magic here...
 
         print("\nData loaded successfully!\n\n\n")
@@ -510,8 +617,13 @@ def onExclude():
 def printExcluded():
     global EXCLUDED_ANIMALS_BOOLS
     global EXCLUDED_ANIMALS_MONITOR_FILES  # List of pd.DataFrames for future plotting
+    global EXCLUDED_ANIMALS_SMOOTHED
+    global EXCLUDED_ANIMALS_AVG_STD
+    global EXCLUDED_ANIMALS_ZSCORED
 
-    excl_str = "/excluded"
+    global EXCL_STR     # Later defined by the unique set of excluded animals
+
+    EXCL_STR = "excl_"  # This will be used to create a specific directory for the excluded animals
 
     EXCLUDED_ANIMALS_BOOLS = []
     EXCLUDED_ANIMALS_MONITOR_FILES = []
@@ -533,10 +645,10 @@ def printExcluded():
         # And each exclusion is saved to a specific directory, for identification purposes.
         for j, bool in enumerate(EXCLUDED_ANIMALS_BOOLS[i]):
             if bool:
-                excl_str += "_" + str(j + 1)
+                EXCL_STR += "_" + str(j + 1)
 
-        if not os.path.exists(EXCLUDE_ANIMALS_PATH_DATA + excl_str):
-            os.makedirs(EXCLUDE_ANIMALS_PATH_DATA + excl_str)
+        if not os.path.exists(EXCLUDE_ANIMALS_PATH_DATA + EXCL_STR):
+            os.makedirs(EXCLUDE_ANIMALS_PATH_DATA + EXCL_STR)
             print("Created specific directory based on excluded animals")
         else:
             print(
@@ -548,31 +660,34 @@ def printExcluded():
             slice.drop(columns=excluded_animal_columns)
         )
         EXCLUDED_ANIMALS_MONITOR_FILES[i].to_csv(
-            EXCLUDE_ANIMALS_PATH_DATA + excl_str + "/excluded_" + JUST_FILE_NAMES[i],
+            EXCLUDE_ANIMALS_PATH_DATA + EXCL_STR + "/excluded_" + JUST_FILE_NAMES[i],
             sep="\t",
         )
         print(
-            f"Excluded animals saved to {EXCLUDE_ANIMALS_PATH_DATA + excl_str + '/excluded_' + JUST_FILE_NAMES[i]}"
+            f"Excluded animals saved to {EXCLUDE_ANIMALS_PATH_DATA + EXCL_STR + '/excluded_' + JUST_FILE_NAMES[i]}"
         )
 
-    print("\n\n")
+        print("\n\n")
+
 
 # Plot functions
 
+
 # Plot raw data. This function will be called when the 'Plot raw' button is clicked.
-def rawPlot():
+def rawPlot(monitor_files: list[pd.DataFrame]):
     try:
         t_analyze.rawPlot(
-            MONITOR_FILES, JUST_FILE_NAMES, PREPARED_PATH
+            monitor_files, JUST_FILE_NAMES, PREPARED_PATH
         )  # Add global variables as arguments if needed
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
+
 # Plot raw sliced for all
-def slicedPlot():
+def slicedPlot(monitor_slices: list[pd.DataFrame]):
     try:
         t_analyze.slicedPlot(
-            MONITOR_SLICES,
+            monitor_slices,
             JUST_FILE_NAMES,
             SLICED_PATH,
             START_SLICE,
@@ -587,11 +702,12 @@ def slicedPlot():
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
+
 # Plot raw sliced for individuals
-def slicedIndividualPlot():
+def slicedIndividualPlot(monitor_slices: list[pd.DataFrame]):
     try:
         t_analyze.slicedIndividualPlot(
-            MONITOR_SLICES,
+            monitor_slices,
             JUST_FILE_NAMES,
             SLICED_PATH,
             START_SLICE,
@@ -608,7 +724,83 @@ def slicedIndividualPlot():
         messagebox.showerror("Error", str(e))
 
 
+def runningAveragePlot(smoothed_monitors: list[pd.DataFrame]):
+    try:
+        t_analyze.smoothedPlot(
+            smoothed_monitors,
+            JUST_FILE_NAMES,
+            NUM_DAYS,
+            START_SLICE,
+            END_SLICE,
+            SMOOTHING_WINDOW,
+            MORNING_RAMP_START,
+            EVENING_RAMP_START,
+            EVENING_RAMP_END,
+            RAMP_TIME,
+            RAMP_END_DATE,
+            SLICED_PATH,
+        )
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
 
+
+def runningAverageIndividualPlot(smoothed_monitors: list[pd.DataFrame]):
+    try:
+        t_analyze.smoothedPlotIndividual(
+            smoothed_monitors,
+            JUST_FILE_NAMES,
+            NUM_DAYS,
+            SMOOTHING_WINDOW,
+            START_SLICE,
+            END_SLICE,
+            MORNING_RAMP_START,
+            EVENING_RAMP_START,
+            EVENING_RAMP_END,
+            RAMP_TIME,
+            RAMP_END_DATE,
+            SLICED_PATH,
+        )
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+
+
+def zscoredPlot(zscored_monitors: list[pd.DataFrame]):
+    try:
+        t_analyze.zscoredPlot(
+            zscored_monitors,
+            JUST_FILE_NAMES,
+            NUM_DAYS,
+            START_SLICE,
+            END_SLICE,
+            SMOOTHING_WINDOW,
+            MORNING_RAMP_START,
+            EVENING_RAMP_START,
+            EVENING_RAMP_END,
+            RAMP_TIME,
+            RAMP_END_DATE,
+            SLICED_PATH,
+        )
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+
+def zscoredIndividualPlot(zscored_monitors: list[pd.DataFrame]):
+    try:
+        t_analyze.zscoredIndividual(
+            zscored_monitors,
+            JUST_FILE_NAMES,
+            NUM_DAYS,
+            SMOOTHING_WINDOW,
+            START_SLICE,
+            END_SLICE,
+            MORNING_RAMP_START,
+            EVENING_RAMP_START,
+            EVENING_RAMP_END,
+            RAMP_TIME,
+            RAMP_END_DATE,
+            SLICED_PATH,
+        )
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
 
 
 # Main GUI
@@ -643,6 +835,9 @@ all_widgets.append(font_scale_widget)
 root.title("Damn Simple: A GUI for Simple Visualization of DAM Data")
 root.geometry("1200x1200")
 
+#######################
+# ENTRY FIELDS
+#######################
 
 directory_label = tk.Label(
     root,
@@ -744,7 +939,10 @@ running_average_entry = tk.Entry(root, font=("sans", font_size))
 running_average_entry.pack()
 all_widgets.append(running_average_entry)
 
-# Buttons
+#######################
+# BUTTONS AND CHECKS
+#######################
+
 # Load the data and set major global variables
 load_button = tk.Button(
     root, text="Load data", command=loadData, font=("sans", font_size)
@@ -780,27 +978,32 @@ all_widgets.append(print_globals_button)
 button_frame = tk.Frame(root)
 button_frame.configure(bg="#90EE90")
 button_frame.pack()
-button_frame_label = tk.Label(button_frame, text="Plotting options", font=("sans", font_size, "bold"))
-button_frame_label.grid(row=0, column=0, columnspan=3)
+button_frame_label = tk.Label(
+    button_frame, text="Plotting options", font=("sans", font_size, "bold")
+)
+button_frame_label.grid(row=0, column=0, columnspan=5)
 all_widgets.append(button_frame_label)
 
 
 # Plot raw data
 plot_raw_button_label = tk.Label(
-    button_frame, text="Fig. 1 & 2", font=("sans", font_size)
+    button_frame, text="Fig. 1 & 2", font=("sans", font_size-2)
 )
 plot_raw_button_label.grid(row=1, column=0)
 all_widgets.append(plot_raw_button_label)
 
 plot_raw_button = tk.Button(
-    button_frame, text="Raw data", command=rawPlot, font=("sans", font_size)
+    button_frame,
+    text="Raw data",
+    command=lambda: rawPlot(MONITOR_FILES),
+    font=("sans", font_size)
 )
 plot_raw_button.grid(row=2, column=0)
 all_widgets.append(plot_raw_button)
 
 # Plot sliced
 plot_sliced_button_label = tk.Label(
-    button_frame, text="Fig. 3", font=("sans", font_size)
+    button_frame, text="Fig. 3", font=("sans", font_size-2)
 )
 plot_sliced_button_label.grid(row=1, column=1)
 all_widgets.append(plot_sliced_button_label)
@@ -808,7 +1011,7 @@ all_widgets.append(plot_sliced_button_label)
 plot_sliced_button = tk.Button(
     button_frame,
     text="Sliced all",
-    command=slicedPlot,
+    command=lambda: slicedPlot(MONITOR_SLICES),
     font=("sans", font_size),
 )
 plot_sliced_button.grid(row=2, column=1)
@@ -816,7 +1019,7 @@ all_widgets.append(plot_sliced_button)
 
 # Plot sliced for individuals
 plot_sliced_individual_button_label = tk.Label(
-    button_frame, text="Fig. 4", font=("sans", font_size)
+    button_frame, text="Fig. 4", font=("sans", font_size-2)
 )
 plot_sliced_individual_button_label.grid(row=1, column=2)
 all_widgets.append(plot_sliced_individual_button_label)
@@ -824,17 +1027,81 @@ all_widgets.append(plot_sliced_individual_button_label)
 plot_sliced_individual_button = tk.Button(
     button_frame,
     text="Sliced subplots",
-    command=slicedIndividualPlot,
+    command=lambda: slicedIndividualPlot(MONITOR_SLICES),
     font=("sans", font_size),
 )
 plot_sliced_individual_button.grid(row=2, column=2)
 all_widgets.append(plot_sliced_individual_button)
 
+# Plot running average all
+plot_running_average_button_label = tk.Label(
+    button_frame, text="Fig. 5", font=("sans", font_size-2)
+)
+plot_running_average_button_label.grid(row=1, column=3)
+all_widgets.append(plot_running_average_button_label)
+
+plot_running_average_button = tk.Button(
+    button_frame,
+    text="Run. avg. all",
+    command=lambda: runningAveragePlot(SMOOTHED_MONITORS),
+    font=("sans", font_size),
+)
+plot_running_average_button.grid(row=2, column=3)
+all_widgets.append(plot_running_average_button)
+
+# Plot running average individuals
+plot_running_average_individual_button_label = tk.Label(
+    button_frame, text="Fig. 6", font=("sans", font_size-2)
+)
+plot_running_average_individual_button_label.grid(row=1, column=4)
+all_widgets.append(plot_running_average_individual_button_label)
+
+plot_running_average_individual_button = tk.Button(
+    button_frame,
+    text="Run. avg. subplots",
+    command=lambda: runningAverageIndividualPlot(SMOOTHED_MONITORS),
+    font=("sans", font_size),
+)
+plot_running_average_individual_button.grid(row=2, column=4)
+all_widgets.append(plot_running_average_individual_button)
+
+# Plot z-scored all
+plot_zscored_button_label = tk.Label(
+    button_frame, text="Fig. 7", font=("sans", font_size-2)
+)
+plot_zscored_button_label.grid(row=3, column=1)
+all_widgets.append(plot_zscored_button_label)
+
+plot_zscored_button = tk.Button(
+    button_frame,
+    text="Z-scored all",
+    command=lambda: zscoredPlot(ZSCORED_MONITORS),
+    font=("sans", font_size),
+)
+plot_zscored_button.grid(row=4, column=1)
+all_widgets.append(plot_zscored_button)
+
+# Plot z-scored individuals
+plot_zscored_individual_button_label = tk.Label(
+    button_frame, text="Fig. 8", font=("sans", font_size-2)
+)
+plot_zscored_individual_button_label.grid(row=3, column=2)
+all_widgets.append(plot_zscored_individual_button_label)
+
+plot_zscored_individual_button = tk.Button(
+    button_frame,
+    text="Z-scored subplots",
+    command=lambda: zscoredIndividualPlot(ZSCORED_MONITORS),
+    font=("sans", font_size),
+)
+plot_zscored_individual_button.grid(row=4, column=2)
+all_widgets.append(plot_zscored_individual_button)
 
 
 
-
-
+#######################
+# END OF BUTTONS
+#######################
 
 # scale output text
 scale_output_label = tk.Label(
