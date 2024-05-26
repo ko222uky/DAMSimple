@@ -82,21 +82,11 @@ def loadData():
         global SLICED_PATH
         global EXCLUDE_ANIMALS_PATH
         global EXCLUDE_ANIMALS_PATH_DATA
-        global SMOOTHED_DIR_PATH
-        global Z_SCORED_PATH
-        global FOLDED_AVERAGE_PATH
 
         global MONITOR_FILES
         global MONITOR_SLICES
         global MONITOR_FILE_NAMES
         global JUST_FILE_NAMES
-
-        global SMOOTHED_MONITORS
-
-        global AVG_AND_STD
-        global ZSCORED_MONITORS
-
-        global FOLDED_AVG_MONITORS
 
         # Define global variables from GUI fields
         exclude_animals = EXCLUDE_ANIMALS_VAR.get()
@@ -157,6 +147,7 @@ def loadData():
             + END_SLICE.replace(":", "-")
         )
         EXCLUDE_ANIMALS_PATH = DIR_PATH + "/excluded_animals"
+
         EXCLUDE_ANIMALS_PATH_DATA = (
             EXCLUDE_ANIMALS_PATH
             + "/excluded_animals_data_"
@@ -166,9 +157,6 @@ def loadData():
             + "_to_"
             + END_SLICE.replace(":", "-")
         )
-        SMOOTHED_DIR_PATH = SLICED_PATH + "/smoothed_data"
-        Z_SCORED_PATH = SLICED_PATH + "/z_scored_data"
-        FOLDED_AVERAGE_PATH = SLICED_PATH + "/folded_average_data"
 
         if not os.path.exists(DIR_PATH):
             os.makedirs(DIR_PATH)
@@ -201,27 +189,6 @@ def loadData():
             print("Sliced data directory created: ", SLICED_PATH + "/sliced_data")
         else:
             print("OK. Sliced data directory exists: ", SLICED_PATH + "/sliced_data")
-
-        # Smoothed data directory
-        if not os.path.exists(SMOOTHED_DIR_PATH):
-            os.makedirs(SMOOTHED_DIR_PATH)
-            print("Smoothed data directory created: ", SMOOTHED_DIR_PATH)
-        else:
-            print("OK. Smoothed data directory exists: ", SMOOTHED_DIR_PATH)
-
-        # Z-scored data directory
-        if not os.path.exists(Z_SCORED_PATH):
-            os.makedirs(Z_SCORED_PATH)
-            print("Z-scored data directory created: ", Z_SCORED_PATH)
-        else:
-            print("OK. Z-scored data directory exists: ", Z_SCORED_PATH)
-
-        # Folded average data directory
-        if not os.path.exists(FOLDED_AVERAGE_PATH):
-            os.makedirs(FOLDED_AVERAGE_PATH)
-            print("Folded average data directory created: ", FOLDED_AVERAGE_PATH)
-        else:
-            print("OK. Folded average data directory exists: ", FOLDED_AVERAGE_PATH)
 
         # figure directories
         if not os.path.exists(PREPARED_PATH + "/fig_01"):
@@ -347,148 +314,6 @@ def loadData():
                 SLICED_PATH + "/sliced_data" + f"/sliced_{JUST_FILE_NAMES[i]}", sep="\t"
             )
 
-        # THIS NEXT SECTION MAY BE PLACED INTO A SEPARATE FUNCTION FOR REUSABILITY
-        # Calculate running average (in minutes) for each animal column
-        SMOOTHED_MONITORS = (
-            []
-        )  # Holds the smoothed data for each monitor, as PandasData frames
-
-        for i, monitor in enumerate(MONITOR_SLICES):
-            # We define a FixedForwardWindowIndexer to calculate the forward looking moving average
-            # This is slightly different than the default moving average, which is backward looking and excludes the first range of values by leaving them blank.
-            indexer = pd.api.indexers.FixedForwardWindowIndexer(
-                window_size=SMOOTHING_WINDOW
-            )
-
-            smoothed_monitor = pd.DataFrame()
-
-            # Let's create a df to hold basic statistics...mean and std
-            AVG_AND_STD = pd.DataFrame(columns=monitor.columns, index=["mean", "std"])
-            AVG_AND_STD.index.name = "statistic"
-
-            for column in monitor.columns:
-                smoothed_column_name = column + "_run_avg_" + str(SMOOTHING_WINDOW)
-                smoothed_monitor[smoothed_column_name] = (
-                    monitor[column].rolling(window=indexer, min_periods=1).mean()
-                )  # Change this to a forward looking moving average
-
-                # Let's also calculate average and std here.
-                # Note that avg and std are calculated from the SMOOTHED data.
-                AVG_AND_STD.loc["mean", column] = smoothed_monitor[
-                    smoothed_column_name
-                ].mean()
-                AVG_AND_STD.loc["std", column] = smoothed_monitor[
-                    smoothed_column_name
-                ].std()
-
-            smoothed_monitor.index = monitor.index
-            smoothed_monitor.to_csv(
-                SMOOTHED_DIR_PATH
-                + f"/smoothed_"
-                + str(SMOOTHING_WINDOW)
-                + "min_"
-                + JUST_FILE_NAMES[i],
-                sep="\t",
-            )
-
-            AVG_AND_STD.to_csv(
-                SMOOTHED_DIR_PATH + f"/column_average_and_std_" + JUST_FILE_NAMES[i],
-                sep="\t",
-            )
-            SMOOTHED_MONITORS.append(smoothed_monitor)
-
-            print(
-                f"Calculated running average of {SMOOTHING_WINDOW} min for {JUST_FILE_NAMES[i]}"
-            )
-
-        # Calculate avg and std for each animal column
-        print("\n\n")
-        print("Converting smoothed values to z-score...")
-        ZSCORED_MONITORS = []
-        for i, smoothed_monitor in enumerate(
-            SMOOTHED_MONITORS
-        ):  # We will use the smoothed data to calculate z-scores
-
-            # I define the zscored_monitor to have the original column names (e.g., 'animal_1', 'animal_2', etc.)
-            # It will use the smoothed_monitor index, which is the datetime index. Any of the sliced indices would work.
-            # Define our zscored_monitor
-            zscored_monitor = pd.DataFrame(
-                columns=MONITOR_FILES[i].columns, index=smoothed_monitor.index
-            )
-
-            for j, column in enumerate(zscored_monitor.columns):
-                # Now, for each column in the zscored_monitor, I will assign it to a column of z-scores
-                # which are calculated from the smoothed_monitor files.
-                # I will use the mean and std from the AVG_AND_STD df to calculate the z-scores.
-                zscored_monitor[column] = smoothed_monitor.iloc[:, j].apply(
-                    lambda x: (x - AVG_AND_STD.loc["mean", column])
-                    / AVG_AND_STD.loc["std", column]
-                )
-
-            ZSCORED_MONITORS.append(zscored_monitor)
-            zscored_monitor.to_csv(
-                Z_SCORED_PATH
-                + f"/zscored_{SMOOTHING_WINDOW}_min_run_avg_{JUST_FILE_NAMES[i]}",
-                sep="\t",
-            )
-            print(
-                f"Saved z-scored data to {Z_SCORED_PATH + f'/zscored_{SMOOTHING_WINDOW}_min_run_avg_{JUST_FILE_NAMES[i]}' }"
-            )
-
-        print("\n\n")
-
-        # Calculate the folded average
-        print("Calculating the folded average...")
-        FOLDED_AVG_MONITORS = []
-
-        for i, zscored_monitor in enumerate(ZSCORED_MONITORS):
-            # New folded_avg_monitor will have indices up to 24 hrs. Here, since the index is in minutes, we will have 1440 minutes in a day + 1,...
-            # so that the index goes from 00:00 to 00:00 the next day.
-            folded_avg_monitor = pd.DataFrame(columns=zscored_monitor.columns)
-            folded_avg_monitor.index.name = "time_bin"
-            for column in zscored_monitor:
-                # Fold the data. We can group by the datetime's time, and then calculate the mean for each time.
-                folded_avg_monitor[column] = (
-                    zscored_monitor[column].groupby(zscored_monitor.index.time).mean()
-                )
-
-            # The following seems verbose, but it works to get the correct format.
-            # Slice by the first index, which should be the first time bin, specified by the START_SLICE
-            # Slicing by index name gives a Series where the column names are the index. We only want values.
-
-            first_row_values = folded_avg_monitor.loc[
-                folded_avg_monitor.index[0]
-            ].values  # If I don't use .values, I get a Series with the column names as the index
-
-            # The shape of the values is (32, 1), which is 32 rows. I need 1 row, 32 columns.
-            # Reshape to one row and an unknown number of columns (i.e., -1)
-
-            first_row_values = first_row_values.reshape(1, -1)
-            print(f"First row values: {first_row_values}")
-
-            first_row_df = pd.DataFrame(
-                first_row_values, columns=folded_avg_monitor.columns
-            )
-            first_row_df.index = [
-                folded_avg_monitor.index[0]
-            ]  # Set the index to the first time bin
-            print("First row df:")
-            print(first_row_df)
-
-            # Now, we will concat the first row to the end of the folded_avg_monitor
-            print("Concatenating first row to the end of the folded_avg_monitor...\n\n")
-            folded_avg_monitor = pd.concat([folded_avg_monitor, first_row_df], axis=0)
-
-            # Save the monitor by appending to our list of pd.DataFrames
-            FOLDED_AVG_MONITORS.append(folded_avg_monitor)
-
-            folded_avg_monitor.to_csv(
-                FOLDED_AVERAGE_PATH + f"/folded_avg_{JUST_FILE_NAMES[i]}", sep="\t"
-            )
-            print(
-                f"Saved folded average data to {FOLDED_AVERAGE_PATH + f'/folded_avg_{JUST_FILE_NAMES[i]}' }"
-            )
-
         print("\nData loaded successfully!\n\n\n")
 
     except Exception as e:
@@ -514,38 +339,10 @@ def loadingThread():
 
 
 # Test function to see current 'loaded' global variables
-def printGlobals():
+def commit():
     try:
-        print("\n\n\n")
-        print("#############################################\n")
-        print("Global variables:")
-        print("START_SLICE: ", START_SLICE)
-        print("END_SLICE: ", END_SLICE)
-        print("MORNING_RAMP_START: ", MORNING_RAMP_START)
-        print("EVENING_RAMP_START: ", EVENING_RAMP_START)
-        print("EVENING_RAMP_END: ", EVENING_RAMP_END)
-        print("RAMP_TIME: ", RAMP_TIME)
-        print("RAMP_END_DATE: ", RAMP_END_DATE)
-        print("NUM_DAYS: ", NUM_DAYS)
-        print("SMOOTHING_WINDOW: ", SMOOTHING_WINDOW)
 
-        print("\n\n")
-
-        print("DIR_PATH: ", DIR_PATH)
-        print("PREPARED_DATA_PATH: ", PREPARED_DATA_PATH)
-        print("PREPARED_PATH: ", PREPARED_PATH)
-        print("SLICED_PATH: ", SLICED_PATH)
-        print("EXCLUDE_ANIMALS_PATH: ", EXCLUDE_ANIMALS_PATH)
-        print("EXCLUDE_ANIMALS_PATH_DATA: ", EXCLUDE_ANIMALS_PATH_DATA)
-
-        print("\n\n")
-
-        print("MONITOR_FILES: ", MONITOR_FILES)
-        print("MONITOR_FILE_NAMES: ", MONITOR_FILE_NAMES)
-        print("JUST_FILE_NAMES: ", JUST_FILE_NAMES)
-        print("SMOOTHED_MONITORS: ", SMOOTHED_MONITORS)
-        print("#############################################\n")
-
+        print("Committing exclusions...")
         printExcluded()
 
     except Exception as e:
@@ -555,7 +352,9 @@ def printGlobals():
 # End printGlobals
 
 
-def excludableAnimals(monitor_name: str):
+def excludableAnimals(
+    monitor_name: str,
+):  # returns a list of tKinter checkbox variables
     if monitor_name is None:
         print("Data file name is not defined. Monitor name is None.")
         return
@@ -605,8 +404,8 @@ def excludableAnimals(monitor_name: str):
 
 
 def onExclude():
-    global ANIMALS_TO_EXCLUDE
-
+    global ANIMALS_TO_EXCLUDE  # Holds tkinter checkbox variables, which will be appended here.
+    ANIMALS_TO_EXCLUDE = []
     #################
     # If animals are to be excluded, we do so here!
     #################
@@ -628,7 +427,7 @@ def onExclude():
         # Exclude animals!
         # If checked, generate and show the options window
         try:
-            ANIMALS_TO_EXCLUDE = []
+
             for monitor_name in JUST_FILE_NAMES:
                 ANIMALS_TO_EXCLUDE.append(excludableAnimals(monitor_name))
         except Exception as e:
@@ -643,40 +442,64 @@ def onExclude():
 
 # This function also commits the exclusions defined in the check boxes. It saves the excluded animals data file.
 def printExcluded():
-    global EXCLUDED_ANIMALS_BOOLS
+    global EXCLUDE_COMMIT
+
+    EXCLUDE_COMMIT = False
+
+    global EXCLUDED_ANIMALS_BOOLS  # List of list of booleans, used for boolean slicing.
     global EXCLUDED_ANIMALS_MONITOR_FILES  # List of pd.DataFrames for future plotting
-    global EXCLUDED_ANIMALS_SMOOTHED
-    global EXCLUDED_ANIMALS_AVG_STD
-    global EXCLUDED_ANIMALS_ZSCORED
+    global JUST_FILE_NAMES_EXCLUDED
 
     global EXCL_STR  # Later defined by the unique set of excluded animals
 
-    EXCL_STR = "excl_"  # This will be used to create a specific directory for the excluded animals
+    global EXCLUDE_ANIMALS_UNIQUE_PATH  # directory path for the specific excluded animals data and figs. String defined by animals excluded.
 
     EXCLUDED_ANIMALS_BOOLS = []
     EXCLUDED_ANIMALS_MONITOR_FILES = []
+    JUST_FILE_NAMES_EXCLUDED = []
+    EXCLUDE_ANIMALS_UNIQUE_PATH = []
 
     print("Excluded animals based on Boolean-slicing:")
     # Re-initialize the list of boolean values for each animal to exclude
 
     for i, slice in enumerate(MONITOR_SLICES):
+
+        EXCL_STR = "excl"  # This will be used to create a specific directory for the excluded animals
+        # Reasponable to expect that different monitors will have different exclusions.
+        # So each monitor file data may need its own exclusive directory
+        # If one monitor is NOT excluded, it goes to an excl_none. This is redundant but helps with program flow.
+
         # List comprehension to get a list of boolean values from tkinter check variables
         # The boolean list is then appended to my global list
         EXCLUDED_ANIMALS_BOOLS.append([var.get() for var in ANIMALS_TO_EXCLUDE[i]])
         excluded_animal_columns = slice.columns[EXCLUDED_ANIMALS_BOOLS[i]]
+
+        # A new list of file names for the excluded animals.
+        JUST_FILE_NAMES_EXCLUDED.append("excluded_" + JUST_FILE_NAMES[i])
+
         print(
-            f"{JUST_FILE_NAMES[i]}: Excluded animal indices: {excluded_animal_columns}"
+            f"{JUST_FILE_NAMES_EXCLUDED[i]}: Excluded animal indices: {excluded_animal_columns}"
         )
 
         # Concatenate the animal numbers to a string, which will be used to create a specific directory.
         # This lets us make multiple unique exclusions while saving the data.
         # And each exclusion is saved to a specific directory, for identification purposes.
+
+        any_excl = False  # Sets as false. If an animal is excluded, below, it is assigned True.
+
         for j, bool in enumerate(EXCLUDED_ANIMALS_BOOLS[i]):
+
             if bool:
+                any_excl = True
                 EXCL_STR += "_" + str(j + 1)
 
-        if not os.path.exists(EXCLUDE_ANIMALS_PATH_DATA + "/" + EXCL_STR):
-            os.makedirs(EXCLUDE_ANIMALS_PATH_DATA + "/" + EXCL_STR)
+        if any_excl == False:
+            EXCL_STR += "_none"
+
+        EXCLUDE_ANIMALS_UNIQUE_PATH.append(EXCLUDE_ANIMALS_PATH_DATA + "/" + EXCL_STR)
+
+        if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i]):
+            os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i])
             print("Created specific directory based on excluded animals")
         else:
             print(
@@ -687,22 +510,327 @@ def printExcluded():
         EXCLUDED_ANIMALS_MONITOR_FILES.append(
             slice.drop(columns=excluded_animal_columns)
         )
+
         EXCLUDED_ANIMALS_MONITOR_FILES[i].to_csv(
-            EXCLUDE_ANIMALS_PATH_DATA
-            + "/"
-            + EXCL_STR
-            + "/excluded_"
-            + JUST_FILE_NAMES[i],
+            EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/" + JUST_FILE_NAMES_EXCLUDED[i],
             sep="\t",
         )
         print(
-            f"Excluded animals saved to {EXCLUDE_ANIMALS_PATH_DATA + '/' + EXCL_STR + '/excluded_' + JUST_FILE_NAMES[i]}"
+            f"Excluded animals saved to {EXCLUDE_ANIMALS_UNIQUE_PATH[i] + '/' + JUST_FILE_NAMES_EXCLUDED[i]}"
+        )
+        print("\n\n")
+        print(
+            f"global EXCLUDABLE_ANIMALS_MONITOR_FILES is of type {type(EXCLUDED_ANIMALS_MONITOR_FILES)}"
         )
 
-        print("\n\n")
+        EXCLUDE_COMMIT = True
 
 
-# Plot functions
+def processData():
+
+    # Batches will contain lists of ALL monitor data, both the unexcluded and excluded animals data
+    global SLICED_BATCH
+    global SMOOTHED_BATCH
+    global ZSCORED_BATCH
+    global FOLDED_AVG_BATCH
+
+    # Globals for holding the data of the non-excluded animals data
+    global SMOOTHED_MONITORS
+    global AVG_AND_STD
+    global ZSCORED_MONITORS
+    global FOLDED_AVG_MONITORS
+
+    SMOOTHED_MONITORS = []
+    AVG_AND_STD = []
+    ZSCORED_MONITORS = []
+    FOLDED_AVG_MONITORS = []
+
+    # Batches hold all of the excluded animal monitor data, too.
+    SLICED_BATCH = [MONITOR_SLICES]
+    SMOOTHED_BATCH = [SMOOTHED_MONITORS]
+    AVG_AND_STD_BATCH = [AVG_AND_STD]
+    ZSCORED_BATCH = [ZSCORED_MONITORS]
+    FOLDED_AVG_BATCH = [FOLDED_AVG_MONITORS]
+
+    DIRECTORY_BATCH = [SLICED_PATH]
+    JUST_FILE_NAMES_BATCH = [JUST_FILE_NAMES]
+
+    if EXCLUDE_COMMIT:
+
+        # globals for holding the data of the excluded animals data
+        global EXCLUDED_ANIMALS_SMOOTHED
+        global EXCLUDED_ANIMALS_AVG_STD
+        global EXCLUDED_ANIMALS_ZSCORED
+
+        EXCLUDED_ANIMALS_SMOOTHED = []
+        EXCLUDED_ANIMALS_AVG_STD = [
+            None for _ in range(len(EXCLUDED_ANIMALS_MONITOR_FILES))
+        ]
+        EXCLUDED_ANIMALS_ZSCORED = []
+
+        try:
+            print("Excluded animals data will be included in the data processing")
+
+            # We want to append, not extend. Extend would add multiple elements. But we want to add a single element, which is another list.
+            SLICED_BATCH.append(EXCLUDED_ANIMALS_MONITOR_FILES)
+            SMOOTHED_BATCH.append(EXCLUDED_ANIMALS_SMOOTHED)
+            AVG_AND_STD_BATCH.append(EXCLUDED_ANIMALS_AVG_STD)
+            ZSCORED_BATCH.append(EXCLUDED_ANIMALS_ZSCORED)
+
+            DIRECTORY_BATCH.append(EXCLUDE_ANIMALS_UNIQUE_PATH)
+
+            JUST_FILE_NAMES_BATCH.append(JUST_FILE_NAMES_EXCLUDED)
+
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    else:
+        print("Exclusions either not committed or in progress...")
+
+    try:
+        # MAIN OUTER LOOP
+        for k, SLICED_DATA_LIST in enumerate(SLICED_BATCH):
+
+            if k == 0:  # For the non-excluded animal data
+                current_directory = DIRECTORY_BATCH[k]
+                # smoothed data dir
+                if not os.path.exists(DIRECTORY_BATCH[k] + "/smoothed_data"):
+                    os.makedirs(DIRECTORY_BATCH[k] + "/smoothed_data")
+                    print(f"Created {DIRECTORY_BATCH[k]}/smoothed_data directory")
+                else:
+                    print(f"OK. {DIRECTORY_BATCH[k]}/smoothed_data exists")
+
+                # zscored data dir
+                if not os.path.exists(DIRECTORY_BATCH[k] + "/z_scored_data"):
+                    os.makedirs(DIRECTORY_BATCH[k] + "/z_scored_data")
+                    print(f"Created {DIRECTORY_BATCH[k]}/z_scored_data directory")
+                else:
+                    print(f"OK. {DIRECTORY_BATCH[k]}/z_scored_data exists")
+
+                # folded average data dir
+                if not os.path.exists(DIRECTORY_BATCH[k] + "/folded_average_data"):
+                    os.makedirs(DIRECTORY_BATCH[k] + "/folded_average_data")
+                    print(f"Created {DIRECTORY_BATCH[k]}/folded_average_data directory")
+                else:
+                    print(f"OK. {DIRECTORY_BATCH[k]}/folded_average_data exists")
+
+            if k > 0:  # This corresponds to our excluded animals.
+                print("######################################\n\n")
+                print(f"Now processing excluded animals data...")
+
+                for path in DIRECTORY_BATCH[k]:
+
+                    if not os.path.exists(path + "/smoothed_data"):
+                        os.makedirs(path + "/smoothed_data")
+                        print(f"Created {path}/smoothed_data directory")
+                    else:
+                        print(f"OK. {path} /smoothed_data exists")
+
+                    # zscored data dir
+                    if not os.path.exists(path + "/z_scored_data"):
+                        os.makedirs(path + "/z_scored_data")
+                        print(f"Created {path}/z_scored_data directory")
+                    else:
+                        print(f"OK. {path}/z_scored_data exists")
+
+                    # folded average data dir
+                    if not os.path.exists(path + "/folded_average_data"):
+                        os.makedirs(path + "/folded_average_data")
+                        print(f"Created {path}/folded_average_data directory")
+                    else:
+                        print(f"OK. {path}/folded_average_data exists")
+
+            # Calculate running average (in minutes) for each animal column
+            for i, monitor in enumerate(SLICED_DATA_LIST):
+
+                if (
+                    k > 0
+                ):  # For the excluded monitors, each monitor may have its own directory.
+                    # And thus we expect DIRECTORY_BATCH[k>0] to be a list of directories...
+                    current_directory = DIRECTORY_BATCH[k][i]
+
+                # We define a FixedForwardWindowIndexer to calculate the forward looking moving average
+                # This is slightly different than the default moving average, which is backward looking and excludes the first range of values by leaving them blank.
+                indexer = pd.api.indexers.FixedForwardWindowIndexer(
+                    window_size=SMOOTHING_WINDOW
+                )
+
+                smoothed_monitor = pd.DataFrame()
+                
+                avg_and_std = pd.DataFrame(
+                    columns=monitor.columns, index=["mean", "std"]
+                )
+                avg_and_std.index.name = "statistic"
+
+                for column in monitor.columns:
+                    smoothed_column_name = column + "_run_avg_" + str(SMOOTHING_WINDOW)
+
+                    smoothed_monitor[smoothed_column_name] = (
+                        monitor[column].rolling(window=indexer, min_periods=1).mean()
+                    )  # Change this to a forward looking moving average
+
+                    # Let's also calculate average and std here.
+                    # Note that avg and std are calculated from the SMOOTHED data.
+                    avg_and_std.loc["mean", column] = smoothed_monitor[
+                        smoothed_column_name
+                    ].mean()
+                    avg_and_std.loc["std", column] = smoothed_monitor[
+                        smoothed_column_name
+                    ].std()
+
+                smoothed_monitor.index = monitor.index
+
+                smoothed_monitor.to_csv(
+                    current_directory
+                    + "/smoothed_data"
+                    + "/"
+                    + str(SMOOTHING_WINDOW)
+                    + "min_running_avg_"
+                    + JUST_FILE_NAMES_BATCH[k][i],
+                    sep="\t",
+                )
+
+                avg_and_std.to_csv(  # Paired with z_scored data since avg and std relevant in calculating zscores
+                    current_directory
+                    + "/z_scored_data"
+                    + "/column_average_and_std_"
+                    + JUST_FILE_NAMES_BATCH[k][i],
+                    sep="\t",
+                )
+                SMOOTHED_BATCH[k].append(smoothed_monitor)
+
+                AVG_AND_STD_BATCH[k].append(avg_and_std)
+                print(f"TYPE FOR AVG_AND_STD_BATCH[k] = {type(AVG_AND_STD_BATCH[k])}")
+                print(
+                    f"Calculated running average of {SMOOTHING_WINDOW} min for {JUST_FILE_NAMES_BATCH[k][i]}"
+                )
+
+            # Calculate avg and std for each animal column
+            print("\n\n")
+            print("Converting smoothed values to z-score...")
+
+            ZSCORED_BATCH[k] = []
+
+            for i, smoothed_monitor in enumerate(
+                SMOOTHED_BATCH[k]
+            ):  # We will use the smoothed data to calculate z-scores
+
+                if k > 0:
+                    current_directory = DIRECTORY_BATCH[k][i]
+
+                # I define the zscored_monitor to have the original column names (e.g., 'animal_1', 'animal_2', etc.)
+                # It will use the smoothed_monitor index, which is the datetime index. Any of the sliced indices would work.
+                # Define our zscored_monitor
+                zscored_monitor = pd.DataFrame(
+                    columns=SLICED_DATA_LIST[i].columns, index=smoothed_monitor.index
+                )
+
+                for j, column in enumerate(zscored_monitor.columns):
+                    # Now, for each column in the zscored_monitor, I will assign it to a column of z-scores
+                    # which are calculated from the smoothed_monitor files.
+                    # I will use the mean and std from the AVG_AND_STD df to calculate the z-scores.
+                    zscored_monitor[column] = smoothed_monitor.iloc[:, j].apply(
+                        lambda x: (x - AVG_AND_STD_BATCH[k][i].loc["mean", column])
+                        / AVG_AND_STD_BATCH[k][i].loc["std", column]
+                    )
+
+                ZSCORED_BATCH[k].append(zscored_monitor)
+                zscored_monitor.to_csv(
+                    current_directory
+                    + "/z_scored_data"
+                    + f"/zscored_{SMOOTHING_WINDOW}_min_run_avg_{JUST_FILE_NAMES_BATCH[k][i]}",
+                    sep="\t",
+                )
+                print(
+                    f"Saved z-scored data to {current_directory}/z_scored_data/zscored_{SMOOTHING_WINDOW}_min_run_avg_{JUST_FILE_NAMES_BATCH[k][i]}"
+                )
+
+            print("\n\n")
+
+            # Calculate the folded average
+            print("Calculating the folded average...")
+
+            FOLDED_AVG_BATCH[k] = []
+
+            for i, zscored_monitor in enumerate(ZSCORED_BATCH[k]):
+
+                if k > 0:
+                    current_directory = DIRECTORY_BATCH[k][i]
+
+                # New folded_avg_monitor will have indices up to 24 hrs. Here, since the index is in minutes, we will have 1440 minutes in a day + 1,...
+                # so that the index goes from 00:00 to 00:00 the next day.
+                folded_avg_monitor = pd.DataFrame(columns=zscored_monitor.columns)
+                folded_avg_monitor.index.name = "time_bin"
+                for column in zscored_monitor:
+                    # Fold the data. We can group by the datetime's time, and then calculate the mean for each time.
+                    folded_avg_monitor[column] = (
+                        zscored_monitor[column]
+                        .groupby(zscored_monitor.index.time)
+                        .mean()
+                    )
+
+                # The following seems verbose, but it works to get the correct format.
+                # Slice by the first index, which should be the first time bin, specified by the START_SLICE
+                # Slicing by index name gives a Series where the column names are the index. We only want values.
+
+                first_row = folded_avg_monitor.loc[
+                    folded_avg_monitor.index[0]
+                ].values  # If I don't use .values, I get a Series with the column names as the index
+
+                # The shape of the values is (32, 1), which is 32 rows. I need 1 row, 32 columns.
+                # Reshape to one row and an unknown number of columns (i.e., -1)
+
+                first_row = first_row.reshape(1, -1)
+                print(f"First row values: {first_row}")
+
+                first_row_df = pd.DataFrame(
+                    first_row, columns=folded_avg_monitor.columns
+                )
+                first_row_df.index = [
+                    folded_avg_monitor.index[0]
+                ]  # Set the index to the first time bin
+                print("First row df:")
+                print(first_row_df)
+
+                # Now, we will concat the first row to the end of the folded_avg_monitor
+                print(
+                    "Concatenating first row to the end of the folded_avg_monitor...\n\n"
+                )
+                folded_avg_monitor = pd.concat(
+                    [folded_avg_monitor, first_row_df], axis=0
+                )
+
+                # Save the monitor by appending to our list of pd.DataFrames
+                FOLDED_AVG_BATCH[k].append(folded_avg_monitor)
+
+                folded_avg_monitor.to_csv(
+                    current_directory
+                    + "/folded_average_data"
+                    + f"/folded_avg_{JUST_FILE_NAMES_BATCH[k][i]}",
+                    sep="\t",
+                )
+                print(
+                    f"Saved folded average data to {current_directory}/folded_average_data/folded_avg_{JUST_FILE_NAMES_BATCH[k][i]}"
+                )
+
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+
+
+def processDataThread():
+    try:
+        threading.Thread(
+            target=processData, daemon=True
+        ).start()  # Daemon is false, to avoid abrupt termination when reading/writing files
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+
+
+# End loadingThread
+
+
+# Plot commands for GUI buttons
+# Add argument for directory path
 
 
 # Plot raw data. This function will be called when the 'Plot raw' button is clicked.
@@ -978,7 +1106,7 @@ all_widgets.append(running_average_entry)
 
 # Load the data and set major global variables
 load_button = tk.Button(
-    root, text="Load data", command=loadData, font=("sans", font_size)
+    root, text="1. Load data", command=loadData, font=("sans", font_size)
 )
 load_button.pack()
 all_widgets.append(load_button)
@@ -988,7 +1116,7 @@ EXCLUDE_ANIMALS_VAR = tk.BooleanVar()
 EXCLUDE_ANIMALS_VAR.trace_add("write", lambda *args: onExclude())
 exclude_animals_checkbutton = tk.Checkbutton(
     root,
-    text="Exclude Animals? Check for 'yes':",
+    text="2. Exclude Animals? Check for 'yes':",
     variable=EXCLUDE_ANIMALS_VAR,
     font=("sans", font_size),
 )
@@ -999,12 +1127,20 @@ all_widgets.append(exclude_animals_checkbutton)
 # Commit the exclusions, if any. Print globals to verify correctness and the exclusions.
 print_globals_button = tk.Button(
     root,
-    text="Print globals and commit exclusions",
-    command=printGlobals,
+    text="3. Commit exclusions",
+    command=commit,
     font=("sans", font_size),
 )
 print_globals_button.pack()
 all_widgets.append(print_globals_button)
+
+
+# Process data
+process_data_button = tk.Button(
+    root, text="4. Process data", command=processDataThread, font=("sans", font_size)
+)
+process_data_button.pack()
+all_widgets.append(process_data_button)
 
 # BUTTONS FOR PLOTTING
 # Create a separate frame for the buttons, so I can use a grid layout

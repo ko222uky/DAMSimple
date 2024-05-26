@@ -24,7 +24,6 @@ def drawLD(
     ramp_time=timedelta(hours=3),
     ramp_end_date=datetime.strptime("9999-12-30", "%Y-%m-%d"),
 ):
-
     # Iterate through the minute_ticks. That is, we iterate through each minute in the range of dates we are plotting.
     for minute_tick in minute_ticks:  # minute_tick is the current datetime in the loop
         if (
@@ -104,6 +103,15 @@ def drawLD(
             )
 
 
+# End LD algorithm
+
+####################
+# BASIC PLOTTING FUNCTIONS
+####################
+
+
+# First two functions handle the raw, unsliced data
+# FOR PLOTTING ALL ANIMALS
 def plot_raw(data: pd.DataFrame, _i: int, monitor_name: str = "Monitor"):
     data.plot(kind="line", legend=False, figsize=(12, 8))  # figsize is in inches
 
@@ -134,6 +142,7 @@ def plot_raw(data: pd.DataFrame, _i: int, monitor_name: str = "Monitor"):
 
 
 # Create a figure and a grid of subplots
+# FOR PLOTTING INDIVIDUAL ANIMALS
 def subplots_raw(
     data: pd.DataFrame, _j: int, days: int = 1, monitor_name: str = "Monitor"
 ):
@@ -175,9 +184,12 @@ def subplots_raw(
     return plt
 
 
-def plot_raw_sliced(
+# Next two functions handle all sliced data (including smoothed, zscored, etc)
+
+
+# FOR PLOTTING ALL ANIMALS
+def plot_sliced_all(
     data: pd.DataFrame,
-    _i: int,
     num_days: int,
     start_slice: str,
     end_slice: str,
@@ -187,6 +199,10 @@ def plot_raw_sliced(
     evening_ramp_end=dt_time(21, 0),
     ramp_time=timedelta(hours=3),
     ramp_end_date=datetime.strptime("9999-12-30", "%Y-%m-%d"),
+    graph_title: str = "Untitled",
+    yaxis_label: str = "Y-axis",
+    xaxis_label: str = "X-axis",
+    xticks: str = "6h",
 ):
     # Assuming `data` is your DataFrame, we will create a plot with a single subplot.
     fig, ax1 = plt.subplots(figsize=(12, 12))
@@ -203,8 +219,8 @@ def plot_raw_sliced(
     )  # end time is start_time plus 240 hours later
     ax1.set_xlim([start_time, end_time])  # set the x-axis limit
 
-    # This date range will set the x-axis ticks. We go from start to end, in 6h intervals
-    date_range = pd.date_range(start=start_time, end=end_time, freq="6h")
+    # This date range will set the x-axis ticks. We go from start to end, defined intervals. Default is 6h.
+    date_range = pd.date_range(start=start_time, end=end_time, freq=xticks)
 
     # Set the x-axis ticks. There is one tick per interval, as defined in date_range
     ax1.set_xticks(date_range)
@@ -237,7 +253,7 @@ def plot_raw_sliced(
     # Set titles and axes names
     ax1.set_title(
         monitor_name
-        + " Raw Locomotor Activity "
+        + f" {graph_title} "  # Unique str for specifying type of data of the graph.
         + str(num_days)
         + "_days_"
         + start_slice
@@ -245,16 +261,16 @@ def plot_raw_sliced(
         + end_slice,
         fontsize=16,
     )
-    ax1.set_ylabel("Counts per minute", fontsize=14)
-    ax1.set_xlabel("Local time", fontsize=14)
+    ax1.set_ylabel(yaxis_label, fontsize=14)
+    ax1.set_xlabel(xaxis_label, fontsize=14)
 
     plt.tight_layout()
     return plt
 
 
-def subplots_raw_sliced(
+# FOR PLOTTING SEPARATE INDIVIDUALS VIA SUBPLOTS
+def plot_sliced_individuals(
     data: pd.DataFrame,
-    _j: int,
     num_days: int,
     start_time: str,
     end_time: str,
@@ -265,6 +281,9 @@ def subplots_raw_sliced(
     evening_ramp_end=dt_time(21, 0),
     ramp_time=timedelta(hours=3),
     ramp_end_date=datetime.strptime("9999-12-30", "%Y-%m-%d"),
+    graph_title: str = "Untitled",
+    yaxis_label: str = "Y-axis",
+    xaxis_label: str = "X-axis",
 ):
     # Grid dimensions for our main figure that holds our axs subplots
     nrows = 4
@@ -290,14 +309,14 @@ def subplots_raw_sliced(
         # Reformat the x-axis labels using datetime
         axs[i].xaxis.set_major_locator(
             mdates.DayLocator(interval=days)
-        )  # Set major tick every 3 days
+        )  # Set major tick every n days
         axs[i].xaxis.set_major_formatter(
             mdates.DateFormatter("%b %d")
         )  # Format the datetime as 'HH:MM', instead of showing the whole dt
 
         axs[i].tick_params("x", labelrotation=90)
-        axs[i].set_ylabel("counts/min", fontsize=12)
-        axs[i].set_xlabel("date", fontsize=8)
+        axs[i].set_ylabel(yaxis_label, fontsize=12)
+        axs[i].set_xlabel(xaxis_label, fontsize=8)
 
         # Minute ticks, so we have minute precision in specifying the light and dark bars
         minute_ticks = pd.date_range(start=start_time, end=end_time, freq="1min")
@@ -316,7 +335,7 @@ def subplots_raw_sliced(
 
     fig.suptitle(
         monitor_name
-        + " Raw Locomotor Activity "
+        + f" {graph_title} "
         + str(num_days)
         + "_days_"
         + start_time
@@ -328,330 +347,21 @@ def subplots_raw_sliced(
     return plt
 
 
-# end of subplots_raw_sliced
+####################
+# END BASIC PLOTTING FUNCTIONS
+####################
 
-
-def plot_smooth_sliced(
-    data: pd.DataFrame,
-    _i: int,
-    num_days: int,
-    start_slice: str,
-    end_slice: str,
-    monitor_name: str = "",
-    smoothing_window: int = 99999,
-    morning_ramp_start=dt_time(6, 0),
-    evening_ramp_start=dt_time(18, 0),
-    evening_ramp_end=dt_time(21, 0),
-    ramp_time=timedelta(hours=3),
-    ramp_end_date=datetime.strptime("9999-12-30", "%Y-%m-%d"),
-):
-    # Assuming `data` is your DataFrame, we will create a plot with a single subplot.
-    fig, ax1 = plt.subplots(figsize=(12, 12))
-    # Thus, we only have one Axes object, and that's our entire dataframe.
-    data.plot(ax=ax1, legend=False)
-
-    # We need to do this MANUALLY
-    # Manually set the x-axis limits to a smaller range. First, we need a date range...
-    # Define start and end points for our date range.
-    start_time = pd.to_datetime(start_slice)
-    end_time = pd.to_datetime(end_slice)
-
-    ax1.set_xlim([start_time, end_time])  # set the x-axis limit
-
-    # This is the range for the dates and/or times. We go from start to end, in 6h intervals
-    # This should actually be a list of datetime objects
-    date_range = pd.date_range(start=start_time, end=end_time, freq="6h")
-
-    # Set the x-axis ticks. There is one tick per interval, as defined in date_range
-    ax1.set_xticks(date_range)
-
-    # Generate the labels for the ticks
-    # Converts each item in date_range to a string, with the format %H:%M drawn from the date time.
-    labels = [time.strftime("%H:%M") for time in date_range]
-
-    # Set the x-axis labels
-    ax1.set_xticklabels(
-        labels, rotation=90
-    )  # Rotate the labels to make them more readable
-
-    # Minute ticks, so we have minute precision in specifying the light and dark bars
-    minute_ticks = pd.date_range(start=start_time, end=end_time, freq="1min")
-
-    ### DRAW LIGHT AND DARK BARS ###
-    drawLD(
-        minute_ticks,
-        ax1,
-        morning_ramp_start,
-        evening_ramp_start,
-        evening_ramp_end,
-        ramp_time,
-        ramp_end_date,
-    )
-    ### END OF LIGHT AND DARK BARS ###
-
-    # Customize the aesthetics
-    plt.title(
-        monitor_name
-        + " Running Average "
-        + "("
-        + str(smoothing_window)
-        + " min) "
-        + str(num_days)
-        + "_days_"
-        + start_slice
-        + "_to_"
-        + end_slice
-    )
-    plt.xlabel("Local Time")
-    plt.ylabel("Smoothed counts per minute")
-
-    plt.tight_layout()
-    return plt
-
-
-def subplots_smoothed_sliced(
-    data: pd.DataFrame,
-    _j: int,
-    num_days: int,
-    start_time: str,
-    end_time: str,
-    smoothing_window: int = 9999,
-    days: int = 1,
-    monitor_name: str = "",
-    morning_ramp_start=dt_time(6, 0),
-    evening_ramp_start=dt_time(18, 0),
-    evening_ramp_end=dt_time(21, 0),
-    ramp_time=timedelta(hours=3),
-    ramp_end_date=datetime.strptime("9999-12-30", "%Y-%m-%d"),
-):
-    # Grid dimensions for our main figure that holds our axs subplots
-    nrows = 4
-    ncols = 8
-
-    fig, axs = plt.subplots(
-        nrows=nrows, ncols=ncols, figsize=(30, 15)
-    )  # nrows = 4 and ncols = 8 for a 4x8 grid of subplots
-
-    # We now have a 4x8 matrix of Axes objects corresponding to our subplot grid.
-    # To make this easier to iterate through, I can flatten it into a 1D array.
-    axs = axs.flatten()
-
-    for i, (name, series) in enumerate(
-        data.items()
-    ):  # items() returns (column names, Series) pairs that can be iterated over
-        axs[i].plot(
-            series.index, series.values
-        )  # Plots index on x-axis, and series' values on y-axis
-        axs[i].set_title(name)
-
-        # Aesthetics
-        # Reformat the x-axis labels using datetime
-        axs[i].xaxis.set_major_locator(
-            mdates.DayLocator(interval=days)
-        )  # Set major tick every 3 days
-        axs[i].xaxis.set_major_formatter(
-            mdates.DateFormatter("%b %d")
-        )  # Format the datetime as 'HH:MM', instead of showing the whole dt
-
-        axs[i].tick_params("x", labelrotation=90)
-        axs[i].set_ylabel("avg. counts/min", fontsize=12)
-        axs[i].set_xlabel("date", fontsize=8)
-
-        # Minute ticks, so we have minute precision in specifying the light and dark bars
-        minute_ticks = pd.date_range(start=start_time, end=end_time, freq="1min")
-
-        ### DRAW LIGHT AND DARK BARS ###
-        drawLD(
-            minute_ticks,
-            axs[i],
-            morning_ramp_start,
-            evening_ramp_start,
-            evening_ramp_end,
-            ramp_time,
-            ramp_end_date,
-        )
-        ### END OF LIGHT AND DARK BARS ###
-
-    fig.suptitle(
-        monitor_name
-        + " Smoothed "
-        + str(smoothing_window)
-        + " min "
-        + str(num_days)
-        + "_days_"
-        + start_time
-        + "_to_"
-        + end_time,
-        fontsize=16,
-    )
-    plt.tight_layout()
-    return plt
-
-
-def plot_zscored(
-    data: pd.DataFrame,
-    _i: int,
-    num_days: int,
-    start_slice: str,
-    end_slice: str,
-    monitor_name: str = "",
-    smoothing_window: int = 99999,
-    morning_ramp_start=dt_time(6, 0),
-    evening_ramp_start=dt_time(18, 0),
-    evening_ramp_end=dt_time(21, 0),
-    ramp_time=timedelta(hours=3),
-    ramp_end_date=datetime.strptime("9999-12-30", "%Y-%m-%d"),
-):
-    # Assuming `data` is your DataFrame, we will create a plot with a single subplot.
-    fig, ax1 = plt.subplots(figsize=(12, 12))
-    # Thus, we only have one Axes object, and that's our entire dataframe.
-    data.plot(ax=ax1, legend=False)
-
-    # We need to do this MANUALLY
-    # Manually set the x-axis limits to a smaller range. First, we need a date range...
-    # Define start and end points for our date range.
-    start_time = pd.to_datetime(start_slice)
-    end_time = pd.to_datetime(end_slice)
-
-    ax1.set_xlim([start_time, end_time])  # set the x-axis limit
-
-    # This is the range for the dates and/or times. We go from start to end, in 6h intervals
-    # This should actually be a list of datetime objects
-    date_range = pd.date_range(start=start_time, end=end_time, freq="6h")
-
-    # Set the x-axis ticks. There is one tick per interval, as defined in date_range
-    ax1.set_xticks(date_range)
-
-    # Generate the labels for the ticks
-    # Converts each item in date_range to a string, with the format %H:%M drawn from the date time.
-    labels = [time.strftime("%H:%M") for time in date_range]
-
-    # Set the x-axis labels
-    ax1.set_xticklabels(
-        labels, rotation=90
-    )  # Rotate the labels to make them more readable
-
-    # Minute ticks, so we have minute precision in specifying the light and dark bars
-    minute_ticks = pd.date_range(start=start_time, end=end_time, freq="1min")
-
-    ### DRAW LIGHT AND DARK BARS ###
-    drawLD(
-        minute_ticks,
-        ax1,
-        morning_ramp_start,
-        evening_ramp_start,
-        evening_ramp_end,
-        ramp_time,
-        ramp_end_date,
-    )
-    ### END OF LIGHT AND DARK BARS ###
-
-    # Customize the aesthetics
-    plt.title(
-        monitor_name
-        + " run. avg. Z-scored"
-        + "("
-        + str(smoothing_window)
-        + " min) "
-        + str(num_days)
-        + "_days_"
-        + start_slice
-        + "_to_"
-        + end_slice
-    )
-    plt.xlabel("Local Time")
-    plt.ylabel("Z-scored counts/min")
-
-    plt.tight_layout()
-    return plt
-
-
-def subplots_zscored(
-    data: pd.DataFrame,
-    _j: int,
-    num_days: int,
-    start_time: str,
-    end_time: str,
-    smoothing_window: int = 9999,
-    days: int = 1,
-    monitor_name: str = "",
-    morning_ramp_start=dt_time(6, 0),
-    evening_ramp_start=dt_time(18, 0),
-    evening_ramp_end=dt_time(21, 0),
-    ramp_time=timedelta(hours=3),
-    ramp_end_date=datetime.strptime("9999-12-30", "%Y-%m-%d"),
-):
-    # Grid dimensions for our main figure that holds our axs subplots
-    nrows = 4
-    ncols = 8
-
-    fig, axs = plt.subplots(
-        nrows=nrows, ncols=ncols, figsize=(30, 15)
-    )  # nrows = 4 and ncols = 8 for a 4x8 grid of subplots
-
-    # We now have a 4x8 matrix of Axes objects corresponding to our subplot grid.
-    # To make this easier to iterate through, I can flatten it into a 1D array.
-    axs = axs.flatten()
-
-    for i, (name, series) in enumerate(
-        data.items()
-    ):  # items() returns (column names, Series) pairs that can be iterated over
-        axs[i].plot(
-            series.index, series.values
-        )  # Plots index on x-axis, and series' values on y-axis
-        axs[i].set_title(name)
-
-        # Aesthetics
-        # Reformat the x-axis labels using datetime
-        axs[i].xaxis.set_major_locator(
-            mdates.DayLocator(interval=days)
-        )  # Set major tick every 3 days
-        axs[i].xaxis.set_major_formatter(
-            mdates.DateFormatter("%b %d")
-        )  # Format the datetime as 'HH:MM', instead of showing the whole dt
-
-        axs[i].tick_params("x", labelrotation=90)
-        axs[i].set_ylabel("Z-scored counts/min", fontsize=12)
-        axs[i].set_xlabel("date", fontsize=8)
-
-        # Minute ticks, so we have minute precision in specifying the light and dark bars
-        minute_ticks = pd.date_range(start=start_time, end=end_time, freq="1min")
-
-        ### DRAW LIGHT AND DARK BARS ###
-        drawLD(
-            minute_ticks,
-            axs[i],
-            morning_ramp_start,
-            evening_ramp_start,
-            evening_ramp_end,
-            ramp_time,
-            ramp_end_date,
-        )
-        ### END OF LIGHT AND DARK BARS ###
-
-    fig.suptitle(
-        monitor_name
-        + " Z-scored from run avg. "
-        + str(smoothing_window)
-        + " min "
-        + str(num_days)
-        + "_days_"
-        + start_time
-        + "_to_"
-        + end_time,
-        fontsize=16,
-    )
-    plt.tight_layout()
-    return plt
-
-
-# end of subplots_raw_sliced
 
 ###################################################
 ################ MAIN TASKS ## ####################
 ###################################################
 
+# The basic plotting functions can be used for multiple types of the processed data (i.e., running average, zscored)
+# The task functions pass information regarding the graph title, axis labels and saves the plot to a specific directory.
+# Also, the task functions take a list of dataframes and thus iterates through all currently loaded monitor files.
 
+
+# figs 1 and 2
 def rawPlot(
     monitor_files: list[pd.DataFrame], just_file_names: list[str], result_path: str
 ):
@@ -695,6 +405,7 @@ def rawPlot(
             )
 
 
+# fig 3
 def slicedPlot(
     monitor_slices: list[pd.DataFrame],
     just_file_names: list[str],
@@ -709,23 +420,26 @@ def slicedPlot(
     ramp_end_date: datetime,
 ):
     #################
-    # Plot the SLICED raw data, show hour ticks...
+    # Plot the sliced raw data
     #################
 
     for i, monitor in enumerate(monitor_slices):
-        plot = plot_raw_sliced(
+        plot = plot_sliced_all(
             monitor,
-            i,
             num_days,
             start_slice,
             end_slice,
-            just_file_names[i].replace(".txt", ""),
+            just_file_names[i],
             morning_ramp_start,
             evening_ramp_start,
             evening_ramp_end,
             ramp_time,
             ramp_end_date,
+            "raw sliced",
+            "counts/min",
+            "local time",
         )
+
         plot.savefig(
             sliced_path
             + "/fig_03/"
@@ -734,10 +448,11 @@ def slicedPlot(
         )
         plt.close()
         print(
-            f"Saved sliced raw data plot to {sliced_path + '/fig_03/' + just_file_names[i].replace('.txt', '') + '_raw_sliced_data_fig_03.png'}"
+            f"Saved raw sliced data plot to {sliced_path + '/fig_03/' + just_file_names[i].replace('.txt', '') + '_raw_sliced_data_fig_03.png'}"
         )
 
 
+# fig 4
 def slicedIndividualPlot(
     monitor_slices: list[pd.DataFrame],
     just_file_names: list[str],
@@ -752,22 +467,24 @@ def slicedIndividualPlot(
     ramp_end_date: datetime,
 ):
     #################
-    # Subplots of SLICED raw data for each animal
+    # Subplots of sliced raw data for each animal
     ################
     for j, slice in enumerate(monitor_slices):
-        plot = subplots_raw_sliced(
+        plot = plot_sliced_individuals(
             slice,
-            j,
             num_days,
             start_slice,
             end_slice,
-            1,  # Intervals of days for the x-axis
-            just_file_names[j].replace(".txt", ""),
+            1,
+            just_file_names[j],
             morning_ramp_start,
             evening_ramp_start,
             evening_ramp_end,
             ramp_time,
             ramp_end_date,
+            "raw sliced",
+            "counts/min",
+            "local time",
         )
 
         plot.savefig(
@@ -782,6 +499,7 @@ def slicedIndividualPlot(
         )
 
 
+# fig 5
 def smoothedPlot(
     smoothed_monitors: list[pd.DataFrame],
     just_file_names: list[str],
@@ -799,21 +517,22 @@ def smoothedPlot(
     #################
     # Plot the sliced running average!
     ################
-    # Iterate through monitors and plot the smoothed data
+    # Iterate through monitors and plot the data
     for i, monitor in enumerate(smoothed_monitors):
-        plot = plot_smooth_sliced(
+        plot = plot_sliced_all(
             monitor,
-            i,
             num_days,
             start_slice,
             end_slice,
-            just_file_names[i].replace(".txt", ""),
-            smoothing_window,
+            just_file_names[i],
             morning_ramp_start,
             evening_ramp_start,
             evening_ramp_end,
             ramp_time,
             ramp_end_date,
+            "running avg",
+            "smoothed cnts/min",
+            "local time",
         )
 
         plot.savefig(
@@ -838,6 +557,7 @@ def smoothedPlot(
         )
 
 
+# fig 6
 def smoothedPlotIndividual(
     smoothed_monitors: list[pd.DataFrame],
     just_file_names: list[str],
@@ -855,22 +575,23 @@ def smoothedPlotIndividual(
     #################
     # Plot the sliced running average!
     ################
-    # Iterate through monitors and plot the smoothed data
+    # Iterate through monitors and plot the data
     for i, monitor in enumerate(smoothed_monitors):
-        plot = subplots_smoothed_sliced(
+        plot = plot_sliced_individuals(
             monitor,
-            i,
             num_days,
             start_slice,
             end_slice,
-            smoothing_window,
             1,
-            just_file_names[i].replace(".txt", ""),
+            just_file_names[i],
             morning_ramp_start,
             evening_ramp_start,
             evening_ramp_end,
             ramp_time,
             ramp_end_date,
+            "running avg",
+            "smoothed cnts/min",
+            "local time",
         )
 
         plot.savefig(
@@ -895,6 +616,7 @@ def smoothedPlotIndividual(
         )
 
 
+# fig 7
 def zscoredPlot(
     zscored_monitors: list[pd.DataFrame],
     just_file_names: list[str],
@@ -910,23 +632,24 @@ def zscoredPlot(
     sliced_path: str,
 ):
     #################
-    # Plot the sliced running average!
+    # Plot the sliced zscored data
     ################
-    # Iterate through monitors and plot the smoothed data
+    # Iterate through monitors and plot
     for i, monitor in enumerate(zscored_monitors):
-        plot = plot_zscored(
+        plot = plot_sliced_all(
             monitor,
-            i,
             num_days,
             start_slice,
             end_slice,
-            just_file_names[i].replace(".txt", ""),
-            smoothing_window,
+            just_file_names[i],
             morning_ramp_start,
             evening_ramp_start,
             evening_ramp_end,
             ramp_time,
             ramp_end_date,
+            "z-scored",
+            "zscored cnts/min",
+            "local time",
         )
 
         plot.savefig(
@@ -951,6 +674,7 @@ def zscoredPlot(
         )
 
 
+# fig 8
 def zscoredIndividual(
     zscored_monitors: list[pd.DataFrame],
     just_file_names: list[str],
@@ -966,24 +690,25 @@ def zscoredIndividual(
     sliced_path: str,
 ):
     #################
-    # Plot the sliced running average!
+    # Plot the sliced zscored data
     ################
-    # Iterate through monitors and plot the smoothed data
+    # Iterate through monitors and plot
     for i, monitor in enumerate(zscored_monitors):
-        plot = subplots_zscored(
+        plot = plot_sliced_individuals(
             monitor,
-            i,
             num_days,
             start_slice,
             end_slice,
-            smoothing_window,
             1,
-            just_file_names[i].replace(".txt", ""),
+            just_file_names[i],
             morning_ramp_start,
             evening_ramp_start,
             evening_ramp_end,
             ramp_time,
             ramp_end_date,
+            "z-scored",
+            "zscored cnts/min",
+            "local time",
         )
 
         plot.savefig(
