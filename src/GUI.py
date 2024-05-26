@@ -49,6 +49,7 @@ def update_font_size(scale_value):
     for widget in all_widgets:
         widget.config(font=("sans", font_size))
 
+
 def processData():
     # Process data, from RUNNING AVG to FINAL GRAPH
     pass
@@ -61,7 +62,7 @@ def loadData():
         # Declare global variables
         global RECORDING_INTERVAL
         RECORDING_INTERVAL = 1  # 1 minute recording interval, which is the default.
-                                # I may let the user change this in the future
+        # I may let the user change this in the future
 
         global START_SLICE
         global END_SLICE
@@ -96,7 +97,6 @@ def loadData():
         global ZSCORED_MONITORS
 
         global FOLDED_AVG_MONITORS
-
 
         # Define global variables from GUI fields
         exclude_animals = EXCLUDE_ANIMALS_VAR.get()
@@ -169,7 +169,6 @@ def loadData():
         SMOOTHED_DIR_PATH = SLICED_PATH + "/smoothed_data"
         Z_SCORED_PATH = SLICED_PATH + "/z_scored_data"
         FOLDED_AVERAGE_PATH = SLICED_PATH + "/folded_average_data"
-   
 
         if not os.path.exists(DIR_PATH):
             os.makedirs(DIR_PATH)
@@ -437,7 +436,7 @@ def loadData():
             )
 
         print("\n\n")
-        
+
         # Calculate the folded average
         print("Calculating the folded average...")
         FOLDED_AVG_MONITORS = []
@@ -445,21 +444,50 @@ def loadData():
         for i, zscored_monitor in enumerate(ZSCORED_MONITORS):
             # New folded_avg_monitor will have indices up to 24 hrs. Here, since the index is in minutes, we will have 1440 minutes in a day + 1,...
             # so that the index goes from 00:00 to 00:00 the next day.
-            folded_avg_monitor = pd.DataFrame(columns = zscored_monitor.columns)
+            folded_avg_monitor = pd.DataFrame(columns=zscored_monitor.columns)
             folded_avg_monitor.index.name = "time_bin"
             for column in zscored_monitor:
                 # Fold the data. We can group by the datetime's time, and then calculate the mean for each time.
-                folded_avg_monitor[column] = zscored_monitor[column].groupby(zscored_monitor.index.time).mean()
+                folded_avg_monitor[column] = (
+                    zscored_monitor[column].groupby(zscored_monitor.index.time).mean()
+                )
 
-            folded_avg_monitor = folded_avg_monitor.append(folded_avg_monitor.iloc[1,:]) # Append the first row to the end to make the plot look nice
+            # The following seems verbose, but it works to get the correct format.
+            # Slice by the first index, which should be the first time bin, specified by the START_SLICE
+            # Slicing by index name gives a Series where the column names are the index. We only want values.
+
+            first_row_values = folded_avg_monitor.loc[
+                folded_avg_monitor.index[0]
+            ].values  # If I don't use .values, I get a Series with the column names as the index
+
+            # The shape of the values is (32, 1), which is 32 rows. I need 1 row, 32 columns.
+            # Reshape to one row and an unknown number of columns (i.e., -1)
+
+            first_row_values = first_row_values.reshape(1, -1)
+            print(f"First row values: {first_row_values}")
+
+            first_row_df = pd.DataFrame(
+                first_row_values, columns=folded_avg_monitor.columns
+            )
+            first_row_df.index = [
+                folded_avg_monitor.index[0]
+            ]  # Set the index to the first time bin
+            print("First row df:")
+            print(first_row_df)
+
+            # Now, we will concat the first row to the end of the folded_avg_monitor
+            print("Concatenating first row to the end of the folded_avg_monitor...\n\n")
+            folded_avg_monitor = pd.concat([folded_avg_monitor, first_row_df], axis=0)
+
+            # Save the monitor by appending to our list of pd.DataFrames
             FOLDED_AVG_MONITORS.append(folded_avg_monitor)
-            folded_avg_monitor.to_csv(FOLDED_AVERAGE_PATH + f"/folded_avg_{JUST_FILE_NAMES[i]}", sep="\t")
-            print(f"Saved folded average data to {FOLDED_AVERAGE_PATH + f'/folded_avg_{JUST_FILE_NAMES[i]}' }")
-            
 
-
-
-        ## make some magic here...
+            folded_avg_monitor.to_csv(
+                FOLDED_AVERAGE_PATH + f"/folded_avg_{JUST_FILE_NAMES[i]}", sep="\t"
+            )
+            print(
+                f"Saved folded average data to {FOLDED_AVERAGE_PATH + f'/folded_avg_{JUST_FILE_NAMES[i]}' }"
+            )
 
         print("\nData loaded successfully!\n\n\n")
 
@@ -621,7 +649,7 @@ def printExcluded():
     global EXCLUDED_ANIMALS_AVG_STD
     global EXCLUDED_ANIMALS_ZSCORED
 
-    global EXCL_STR     # Later defined by the unique set of excluded animals
+    global EXCL_STR  # Later defined by the unique set of excluded animals
 
     EXCL_STR = "excl_"  # This will be used to create a specific directory for the excluded animals
 
@@ -647,8 +675,8 @@ def printExcluded():
             if bool:
                 EXCL_STR += "_" + str(j + 1)
 
-        if not os.path.exists(EXCLUDE_ANIMALS_PATH_DATA + EXCL_STR):
-            os.makedirs(EXCLUDE_ANIMALS_PATH_DATA + EXCL_STR)
+        if not os.path.exists(EXCLUDE_ANIMALS_PATH_DATA + "/" + EXCL_STR):
+            os.makedirs(EXCLUDE_ANIMALS_PATH_DATA + "/" + EXCL_STR)
             print("Created specific directory based on excluded animals")
         else:
             print(
@@ -660,11 +688,15 @@ def printExcluded():
             slice.drop(columns=excluded_animal_columns)
         )
         EXCLUDED_ANIMALS_MONITOR_FILES[i].to_csv(
-            EXCLUDE_ANIMALS_PATH_DATA + EXCL_STR + "/excluded_" + JUST_FILE_NAMES[i],
+            EXCLUDE_ANIMALS_PATH_DATA
+            + "/"
+            + EXCL_STR
+            + "/excluded_"
+            + JUST_FILE_NAMES[i],
             sep="\t",
         )
         print(
-            f"Excluded animals saved to {EXCLUDE_ANIMALS_PATH_DATA + EXCL_STR + '/excluded_' + JUST_FILE_NAMES[i]}"
+            f"Excluded animals saved to {EXCLUDE_ANIMALS_PATH_DATA + '/' + EXCL_STR + '/excluded_' + JUST_FILE_NAMES[i]}"
         )
 
         print("\n\n")
@@ -782,6 +814,7 @@ def zscoredPlot(zscored_monitors: list[pd.DataFrame]):
         )
     except Exception as e:
         messagebox.showerror("Error", str(e))
+
 
 def zscoredIndividualPlot(zscored_monitors: list[pd.DataFrame]):
     try:
@@ -987,7 +1020,7 @@ all_widgets.append(button_frame_label)
 
 # Plot raw data
 plot_raw_button_label = tk.Label(
-    button_frame, text="Fig. 1 & 2", font=("sans", font_size-2)
+    button_frame, text="Fig. 1 & 2", font=("sans", font_size - 2)
 )
 plot_raw_button_label.grid(row=1, column=0)
 all_widgets.append(plot_raw_button_label)
@@ -996,14 +1029,14 @@ plot_raw_button = tk.Button(
     button_frame,
     text="Raw data",
     command=lambda: rawPlot(MONITOR_FILES),
-    font=("sans", font_size)
+    font=("sans", font_size),
 )
 plot_raw_button.grid(row=2, column=0)
 all_widgets.append(plot_raw_button)
 
 # Plot sliced
 plot_sliced_button_label = tk.Label(
-    button_frame, text="Fig. 3", font=("sans", font_size-2)
+    button_frame, text="Fig. 3", font=("sans", font_size - 2)
 )
 plot_sliced_button_label.grid(row=1, column=1)
 all_widgets.append(plot_sliced_button_label)
@@ -1019,7 +1052,7 @@ all_widgets.append(plot_sliced_button)
 
 # Plot sliced for individuals
 plot_sliced_individual_button_label = tk.Label(
-    button_frame, text="Fig. 4", font=("sans", font_size-2)
+    button_frame, text="Fig. 4", font=("sans", font_size - 2)
 )
 plot_sliced_individual_button_label.grid(row=1, column=2)
 all_widgets.append(plot_sliced_individual_button_label)
@@ -1035,7 +1068,7 @@ all_widgets.append(plot_sliced_individual_button)
 
 # Plot running average all
 plot_running_average_button_label = tk.Label(
-    button_frame, text="Fig. 5", font=("sans", font_size-2)
+    button_frame, text="Fig. 5", font=("sans", font_size - 2)
 )
 plot_running_average_button_label.grid(row=1, column=3)
 all_widgets.append(plot_running_average_button_label)
@@ -1051,7 +1084,7 @@ all_widgets.append(plot_running_average_button)
 
 # Plot running average individuals
 plot_running_average_individual_button_label = tk.Label(
-    button_frame, text="Fig. 6", font=("sans", font_size-2)
+    button_frame, text="Fig. 6", font=("sans", font_size - 2)
 )
 plot_running_average_individual_button_label.grid(row=1, column=4)
 all_widgets.append(plot_running_average_individual_button_label)
@@ -1067,7 +1100,7 @@ all_widgets.append(plot_running_average_individual_button)
 
 # Plot z-scored all
 plot_zscored_button_label = tk.Label(
-    button_frame, text="Fig. 7", font=("sans", font_size-2)
+    button_frame, text="Fig. 7", font=("sans", font_size - 2)
 )
 plot_zscored_button_label.grid(row=3, column=1)
 all_widgets.append(plot_zscored_button_label)
@@ -1083,7 +1116,7 @@ all_widgets.append(plot_zscored_button)
 
 # Plot z-scored individuals
 plot_zscored_individual_button_label = tk.Label(
-    button_frame, text="Fig. 8", font=("sans", font_size-2)
+    button_frame, text="Fig. 8", font=("sans", font_size - 2)
 )
 plot_zscored_individual_button_label.grid(row=3, column=2)
 all_widgets.append(plot_zscored_individual_button_label)
@@ -1096,7 +1129,6 @@ plot_zscored_individual_button = tk.Button(
 )
 plot_zscored_individual_button.grid(row=4, column=2)
 all_widgets.append(plot_zscored_individual_button)
-
 
 
 #######################

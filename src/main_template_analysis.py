@@ -487,6 +487,7 @@ def subplots_smoothed_sliced(
     plt.tight_layout()
     return plt
 
+
 def plot_zscored(
     data: pd.DataFrame,
     _i: int,
@@ -893,6 +894,7 @@ def smoothedPlotIndividual(
             "fig_06.png",
         )
 
+
 def zscoredPlot(
     zscored_monitors: list[pd.DataFrame],
     just_file_names: list[str],
@@ -1004,6 +1006,7 @@ def zscoredIndividual(
             "_min_",
             "fig_08.png",
         )
+
 
 ###################################################
 ################ END OF MAIN TASKS ## #############
