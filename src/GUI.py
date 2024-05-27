@@ -5,11 +5,16 @@ from tkinter import ttk  # access to the Tk themed widget set
 from tkinter import messagebox
 
 import threading
+import queue  # To handle thread-safety for writing to GUI widget
 
 import os
 import glob
 import sys  # For outputting stoud to the text widget
 import sys  # For outputting stoud to the text widget
+
+import faulthandler
+
+faulthandler.enable()
 
 import pandas as pd
 
@@ -22,18 +27,49 @@ from datetime import time as dt_time
 # Each figure that is produced is broken into tasks, e.g., plotRaw().
 import main_template_analysis as t_analyze
 
+# Create directory for ../log files
+if not os.path.exists("../logs"):
+    os.makedirs("../logs")
+    print("Created logs directory")
+else:
+    print("OK. logs exists")
+
+# Create a log file if it doesn't exist
+LOG_FILE = "../logs/" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S") + ".log"
+if not os.path.exists(LOG_FILE):
+    # just open and close it
+    open(LOG_FILE, "w").close()
+
 
 # Class to redirect stdout to a text widget in the Gui
-class TextRedirector(object):
-    def __init__(self, widget):
+# Also redirects output to a log file
+# And also writes to the terminal
+class Logger(object):
+    def __init__(self, widget, filename=LOG_FILE):
+        self.terminal = sys.stdout
+        self.log = open(filename, "w")
         self.widget = widget
+        self.queue = queue.Queue()
 
-    def write(self, str):
-        self.widget.insert(tk.END, str)
-        self.widget.see(tk.END)
+    def write(self, message):
+        # We can write to the terminal and log file: That's thread-safe
+
+        self.terminal.write(message)  # writes a message to the terminal
+        self.log.write(message)  # writes a message to the log file
+
+        # But we cannot write to our widget. So we put the message in a queue
+        self.queue.put(message)  # puts the message in the queue
 
     def flush(self):
-        pass  # This is needed for the file-like object.
+        pass
+
+    def check_queue(self):
+        while not self.queue.empty():  # While the queue is not empty...
+            message = self.queue.get()  # Get the first message...
+
+            # Write the message to the widget. This is thread-safe.
+            self.widget.insert(tk.END, message)
+            self.widget.see(tk.END)
 
 
 # Functions to resize elements in the GUI
@@ -341,7 +377,6 @@ def loadingThread():
 # Test function to see current 'loaded' global variables
 def commit():
     try:
-
         print("Committing exclusions...")
         printExcluded()
 
@@ -427,13 +462,13 @@ def onExclude():
         # Exclude animals!
         # If checked, generate and show the options window
         try:
-
             for monitor_name in JUST_FILE_NAMES:
                 ANIMALS_TO_EXCLUDE.append(excludableAnimals(monitor_name))
         except Exception as e:
             print("ERROR: Did you load the data first?")
     else:
         print("Re-check to open the exclude animals window.")
+        print("Close the old windows first.")
         ANIMALS_TO_EXCLUDE = []
 
 
@@ -463,7 +498,6 @@ def printExcluded():
     # Re-initialize the list of boolean values for each animal to exclude
 
     for i, slice in enumerate(MONITOR_SLICES):
-
         EXCL_STR = "excl"  # This will be used to create a specific directory for the excluded animals
         # Reasponable to expect that different monitors will have different exclusions.
         # So each monitor file data may need its own exclusive directory
@@ -488,7 +522,6 @@ def printExcluded():
         any_excl = False  # Sets as false. If an animal is excluded, below, it is assigned True.
 
         for j, bool in enumerate(EXCLUDED_ANIMALS_BOOLS[i]):
-
             if bool:
                 any_excl = True
                 EXCL_STR += "_" + str(j + 1)
@@ -519,15 +552,13 @@ def printExcluded():
             f"Excluded animals saved to {EXCLUDE_ANIMALS_UNIQUE_PATH[i] + '/' + JUST_FILE_NAMES_EXCLUDED[i]}"
         )
         print("\n\n")
-        print(
-            f"global EXCLUDABLE_ANIMALS_MONITOR_FILES is of type {type(EXCLUDED_ANIMALS_MONITOR_FILES)}"
-        )
 
         EXCLUDE_COMMIT = True
+    print("Exclusions committed! Starting data processing thread...")
+    processDataThread()
 
 
 def processData():
-
     # Batches will contain lists of ALL monitor data, both the unexcluded and excluded animals data
     global SLICED_BATCH
     global SMOOTHED_BATCH
@@ -556,17 +587,16 @@ def processData():
     JUST_FILE_NAMES_BATCH = [JUST_FILE_NAMES]
 
     if EXCLUDE_COMMIT:
-
         # globals for holding the data of the excluded animals data
         global EXCLUDED_ANIMALS_SMOOTHED
         global EXCLUDED_ANIMALS_AVG_STD
         global EXCLUDED_ANIMALS_ZSCORED
+        global EXCLUDED_ANIMALS_FOLDED_AVG
 
         EXCLUDED_ANIMALS_SMOOTHED = []
-        EXCLUDED_ANIMALS_AVG_STD = [
-            None for _ in range(len(EXCLUDED_ANIMALS_MONITOR_FILES))
-        ]
+        EXCLUDED_ANIMALS_AVG_STD = []
         EXCLUDED_ANIMALS_ZSCORED = []
+        EXCLUDED_ANIMALS_FOLDED_AVG = []
 
         try:
             print("Excluded animals data will be included in the data processing")
@@ -576,6 +606,7 @@ def processData():
             SMOOTHED_BATCH.append(EXCLUDED_ANIMALS_SMOOTHED)
             AVG_AND_STD_BATCH.append(EXCLUDED_ANIMALS_AVG_STD)
             ZSCORED_BATCH.append(EXCLUDED_ANIMALS_ZSCORED)
+            FOLDED_AVG_BATCH.append(EXCLUDED_ANIMALS_FOLDED_AVG)
 
             DIRECTORY_BATCH.append(EXCLUDE_ANIMALS_UNIQUE_PATH)
 
@@ -590,7 +621,6 @@ def processData():
     try:
         # MAIN OUTER LOOP
         for k, SLICED_DATA_LIST in enumerate(SLICED_BATCH):
-
             if k == 0:  # For the non-excluded animal data
                 current_directory = DIRECTORY_BATCH[k]
                 # smoothed data dir
@@ -619,7 +649,6 @@ def processData():
                 print(f"Now processing excluded animals data...")
 
                 for path in DIRECTORY_BATCH[k]:
-
                     if not os.path.exists(path + "/smoothed_data"):
                         os.makedirs(path + "/smoothed_data")
                         print(f"Created {path}/smoothed_data directory")
@@ -642,7 +671,6 @@ def processData():
 
             # Calculate running average (in minutes) for each animal column
             for i, monitor in enumerate(SLICED_DATA_LIST):
-
                 if (
                     k > 0
                 ):  # For the excluded monitors, each monitor may have its own directory.
@@ -656,7 +684,7 @@ def processData():
                 )
 
                 smoothed_monitor = pd.DataFrame()
-                
+
                 avg_and_std = pd.DataFrame(
                     columns=monitor.columns, index=["mean", "std"]
                 )
@@ -689,6 +717,15 @@ def processData():
                     + JUST_FILE_NAMES_BATCH[k][i],
                     sep="\t",
                 )
+                print("Saved smoothed data to:")
+                print(
+                    current_directory
+                    + "/smoothed_data"
+                    + "/"
+                    + str(SMOOTHING_WINDOW)
+                    + "min_running_avg_"
+                    + JUST_FILE_NAMES_BATCH[k][i]
+                )
 
                 avg_and_std.to_csv(  # Paired with z_scored data since avg and std relevant in calculating zscores
                     current_directory
@@ -697,10 +734,18 @@ def processData():
                     + JUST_FILE_NAMES_BATCH[k][i],
                     sep="\t",
                 )
+                print("Saved average and std to:")
+                print(
+                    current_directory
+                    + "/z_scored_data"
+                    + "/column_average_and_std_"
+                    + JUST_FILE_NAMES_BATCH[k][i]
+                )
+
                 SMOOTHED_BATCH[k].append(smoothed_monitor)
 
                 AVG_AND_STD_BATCH[k].append(avg_and_std)
-                print(f"TYPE FOR AVG_AND_STD_BATCH[k] = {type(AVG_AND_STD_BATCH[k])}")
+
                 print(
                     f"Calculated running average of {SMOOTHING_WINDOW} min for {JUST_FILE_NAMES_BATCH[k][i]}"
                 )
@@ -709,13 +754,11 @@ def processData():
             print("\n\n")
             print("Converting smoothed values to z-score...")
 
-            ZSCORED_BATCH[k] = []
-
             for i, smoothed_monitor in enumerate(
                 SMOOTHED_BATCH[k]
             ):  # We will use the smoothed data to calculate z-scores
-
                 if k > 0:
+                    print("Setting current directory for excluded animals...")
                     current_directory = DIRECTORY_BATCH[k][i]
 
                 # I define the zscored_monitor to have the original column names (e.g., 'animal_1', 'animal_2', etc.)
@@ -729,18 +772,21 @@ def processData():
                     # Now, for each column in the zscored_monitor, I will assign it to a column of z-scores
                     # which are calculated from the smoothed_monitor files.
                     # I will use the mean and std from the AVG_AND_STD df to calculate the z-scores.
+
                     zscored_monitor[column] = smoothed_monitor.iloc[:, j].apply(
                         lambda x: (x - AVG_AND_STD_BATCH[k][i].loc["mean", column])
                         / AVG_AND_STD_BATCH[k][i].loc["std", column]
                     )
 
                 ZSCORED_BATCH[k].append(zscored_monitor)
+
                 zscored_monitor.to_csv(
                     current_directory
                     + "/z_scored_data"
                     + f"/zscored_{SMOOTHING_WINDOW}_min_run_avg_{JUST_FILE_NAMES_BATCH[k][i]}",
                     sep="\t",
                 )
+
                 print(
                     f"Saved z-scored data to {current_directory}/z_scored_data/zscored_{SMOOTHING_WINDOW}_min_run_avg_{JUST_FILE_NAMES_BATCH[k][i]}"
                 )
@@ -750,10 +796,7 @@ def processData():
             # Calculate the folded average
             print("Calculating the folded average...")
 
-            FOLDED_AVG_BATCH[k] = []
-
             for i, zscored_monitor in enumerate(ZSCORED_BATCH[k]):
-
                 if k > 0:
                     current_directory = DIRECTORY_BATCH[k][i]
 
@@ -812,6 +855,7 @@ def processData():
                 print(
                     f"Saved folded average data to {current_directory}/folded_average_data/folded_avg_{JUST_FILE_NAMES_BATCH[k][i]}"
                 )
+        print("Data processing complete!")
 
     except Exception as e:
         messagebox.showerror("Error", str(e))
@@ -1125,22 +1169,14 @@ all_widgets.append(exclude_animals_checkbutton)
 all_widgets.append(exclude_animals_checkbutton)
 
 # Commit the exclusions, if any. Print globals to verify correctness and the exclusions.
-print_globals_button = tk.Button(
+commit_button = tk.Button(
     root,
-    text="3. Commit exclusions",
+    text="3. Commit exclusions and process data",
     command=commit,
     font=("sans", font_size),
 )
-print_globals_button.pack()
-all_widgets.append(print_globals_button)
-
-
-# Process data
-process_data_button = tk.Button(
-    root, text="4. Process data", command=processDataThread, font=("sans", font_size)
-)
-process_data_button.pack()
-all_widgets.append(process_data_button)
+commit_button.pack()
+all_widgets.append(commit_button)
 
 # BUTTONS FOR PLOTTING
 # Create a separate frame for the buttons, so I can use a grid layout
@@ -1271,6 +1307,11 @@ all_widgets.append(plot_zscored_individual_button)
 # END OF BUTTONS
 #######################
 
+#######################
+# HANDLING OUTPUT TEXT
+#######################
+
+
 # scale output text
 scale_output_label = tk.Label(
     root,
@@ -1287,11 +1328,26 @@ scale_output_text.pack()
 all_widgets.append(scale_output_text)
 
 # output text widget
-output_text = tk.Text(root, width=100, height=30, wrap=tk.WORD, font=("sans", 12))
+output_text = tk.Text(root, width=100, height=30, wrap=tk.WORD, font=("sans", 8))
 output_text.pack()
 
-# Redirect the stdout to the text widget
-sys.stdout = TextRedirector(output_text)
+# Create logger instance using our widget
+# Logs are saved with current timestampe
+
+logger = Logger(output_text, LOG_FILE)
+
+# Print statements normally call sys.stdout.write,...
+# But we redirect output to our logger instance
+# Now, print calls logger.write, which appends the text to the Text widget
+sys.stdout = logger
+
+
+def check_queue():
+    logger.check_queue()
+    root.after(100, check_queue)  # Check every 100 ms. This is a recursive call.
+
+
+root.after(100, check_queue)
 
 # Other formatting for my widgets
 for widget in all_widgets:
@@ -1301,6 +1357,5 @@ for widget in all_widgets:
         widget.configure(bg="#90EE90")
     elif isinstance(widget, tk.Scale):
         widget.configure(bg="#90EE90", bd=5, relief="ridge", cursor="hand2")
-
 
 root.mainloop()

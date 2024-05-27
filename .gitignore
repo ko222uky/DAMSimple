@@ -3,3 +3,4 @@ src/*.ipynb
 
 src/log.txt
 src/__pycache__
+logs/*.log
