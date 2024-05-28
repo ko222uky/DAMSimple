@@ -203,21 +203,23 @@ def plot_sliced_all(
     yaxis_label: str = "Y-axis",
     xaxis_label: str = "X-axis",
     xticks: str = "6h",
+    folded: bool = False,
 ):
     # Assuming `data` is your DataFrame, we will create a plot with a single subplot.
     fig, ax1 = plt.subplots(figsize=(12, 12))
     # Thus, we only have one Axes object, and that's our entire dataframe.
     data.plot(ax=ax1, legend=False)
 
-    # We need to do this MANUALLY
-    # Manually set the x-axis limits to a smaller range
     start_time = pd.to_datetime(
         start_slice
     )  # replace 'your_start_time' with the actual start time. I use slice_start from earlier
     end_time = start_time + timedelta(
         hours=24 * num_days
     )  # end time is start_time plus 240 hours later
-    ax1.set_xlim([start_time, end_time])  # set the x-axis limit
+
+    # We need to do this MANUALLY
+    # Manually set the x-axis limits to the start and end times
+    ax1.set_xlim([start_time, end_time])
 
     # This date range will set the x-axis ticks. We go from start to end, defined intervals. Default is 6h.
     date_range = pd.date_range(start=start_time, end=end_time, freq=xticks)
@@ -251,16 +253,28 @@ def plot_sliced_all(
     ### END OF LIGHT AND DARK BARS ###
 
     # Set titles and axes names
-    ax1.set_title(
-        monitor_name
-        + f" {graph_title} "  # Unique str for specifying type of data of the graph.
-        + str(num_days)
-        + "_days_"
-        + start_slice
-        + "_to_"
-        + end_slice,
-        fontsize=16,
-    )
+    if folded:
+        ax1.set_title(
+            monitor_name
+            + f" {graph_title} "  # Unique str for specifying type of data of the graph.
+            + str(num_days)
+            + "_days_folded_"
+            + "00:00"
+            + "_to_"
+            + "23:59",
+            fontsize=16,
+        )
+    else:
+        ax1.set_title(
+            monitor_name
+            + f" {graph_title} "  # Unique str for specifying type of data of the graph.
+            + str(num_days)
+            + "_days_"
+            + start_slice
+            + "_to_"
+            + end_slice,
+            fontsize=16,
+        )
     ax1.set_ylabel(yaxis_label, fontsize=14)
     ax1.set_xlabel(xaxis_label, fontsize=14)
 
@@ -284,7 +298,9 @@ def plot_sliced_individuals(
     graph_title: str = "Untitled",
     yaxis_label: str = "Y-axis",
     xaxis_label: str = "X-axis",
+    day_intervals: bool = True,
 ):
+
     # Grid dimensions for our main figure that holds our axs subplots
     nrows = 4
     ncols = 8
@@ -300,6 +316,7 @@ def plot_sliced_individuals(
     for i, (name, series) in enumerate(
         data.items()
     ):  # items() returns (column names, Series) pairs that can be iterated over
+
         axs[i].plot(
             series.index, series.values
         )  # Plots index on x-axis, and series' values on y-axis
@@ -307,12 +324,18 @@ def plot_sliced_individuals(
 
         # Aesthetics
         # Reformat the x-axis labels using datetime
-        axs[i].xaxis.set_major_locator(
-            mdates.DayLocator(interval=days)
-        )  # Set major tick every n days
-        axs[i].xaxis.set_major_formatter(
-            mdates.DateFormatter("%b %d")
-        )  # Format the datetime as 'HH:MM', instead of showing the whole dt
+        if day_intervals:
+            axs[i].xaxis.set_major_locator(
+                mdates.DayLocator(interval=days)
+            )  # Set major tick every n days
+            axs[i].xaxis.set_major_formatter(
+                mdates.DateFormatter("%b %d")
+            )  # Format the datetime as, e.g., Jun 23, instead of showing the whole dt
+        else:
+            axs[i].xaxis.set_major_locator(mdates.HourLocator(interval=3))
+            axs[i].xaxis.set_major_formatter(
+                mdates.DateFormatter("%H:%M")
+            )  # Format the datetime as, e.g., Jun 23, instead of showing the whole dt
 
         axs[i].tick_params("x", labelrotation=90)
         axs[i].set_ylabel(yaxis_label, fontsize=12)
@@ -332,17 +355,29 @@ def plot_sliced_individuals(
             ramp_end_date,
         )
         ### END OF LIGHT AND DARK BARS ###
+    if day_intervals:
+        fig.suptitle(
+            monitor_name
+            + f" {graph_title} "
+            + str(num_days)
+            + "_days_"
+            + start_time
+            + "_to_"
+            + end_time,
+            fontsize=16,
+        )
+    else:
+        fig.suptitle(
+            monitor_name
+            + f" {graph_title} "
+            + str(num_days)
+            + "_days_fold_"
+            + "00:00"
+            + "_to_"
+            + "23:59",
+            fontsize=16,
+        )
 
-    fig.suptitle(
-        monitor_name
-        + f" {graph_title} "
-        + str(num_days)
-        + "_days_"
-        + start_time
-        + "_to_"
-        + end_time,
-        fontsize=16,
-    )
     plt.tight_layout()
     return plt
 
@@ -730,6 +765,126 @@ def zscoredIndividual(
             str(smoothing_window),
             "_min_",
             "fig_08.png",
+        )
+
+
+# fig 9
+def foldedPlot(
+    folded_monitors: list[pd.DataFrame],
+    just_file_names: list[str],
+    num_days: int,
+    start_slice: str,
+    end_slice: str,
+    smoothing_window: int,
+    morning_ramp_start: dt_time,
+    evening_ramp_start: dt_time,
+    evening_ramp_end: dt_time,
+    ramp_time: timedelta,
+    ramp_end_date: datetime,
+    sliced_path: str,
+):
+    #################
+    # Plot the sliced folded avg data
+    ################
+    # Iterate through monitors and plot
+    for i, monitor in enumerate(folded_monitors):
+        plot = plot_sliced_all(
+            monitor,
+            num_days,
+            start_slice,
+            end_slice,
+            just_file_names[i],
+            morning_ramp_start,
+            evening_ramp_start,
+            evening_ramp_end,
+            ramp_time,
+            ramp_end_date,
+            "folded avg",
+            "zscored avg cnts/min",
+            "local time",
+            "1h",
+            folded=True,
+        )
+
+        plot.savefig(
+            sliced_path
+            + "/fig_09/"
+            + just_file_names[i].replace(".txt", "")
+            + "_foldedavg_all_"
+            + str(smoothing_window)
+            + "_min_"
+            + "fig_09.png"
+        )
+        plt.close()
+
+        print(
+            f"Saved folded data plot to {sliced_path}",
+            "/fig_09/",
+            just_file_names[i].replace(".txt", ""),
+            "_foldedavg_all_",
+            str(smoothing_window),
+            "_min_",
+            "fig_09.png",
+        )
+
+
+# fig 10
+def foldedIndividual(
+    folded_monitors: list[pd.DataFrame],
+    just_file_names: list[str],
+    num_days: int,
+    smoothing_window: int,
+    start_slice: str,
+    end_slice: str,
+    morning_ramp_start: dt_time,
+    evening_ramp_start: dt_time,
+    evening_ramp_end: dt_time,
+    ramp_time: timedelta,
+    ramp_end_date: datetime,
+    sliced_path: str,
+):
+    #################
+    # Plot the sliced folded individual data
+    ################
+    # Iterate through monitors and plot
+    for i, monitor in enumerate(folded_monitors):
+        plot = plot_sliced_individuals(
+            monitor,
+            num_days,
+            start_slice,
+            end_slice,
+            1,
+            just_file_names[i],
+            morning_ramp_start,
+            evening_ramp_start,
+            evening_ramp_end,
+            ramp_time,
+            ramp_end_date,
+            "folded avg",
+            "zscored avg cnts/min",
+            "local time",
+            day_intervals=False,
+        )
+
+        plot.savefig(
+            sliced_path
+            + "/fig_10/"
+            + just_file_names[i].replace(".txt", "")
+            + "_foldedavg_individuals_"
+            + str(smoothing_window)
+            + "_min_"
+            + "fig_10.png"
+        )
+        plt.close()
+
+        print(
+            f"Saved folded data subplots to {sliced_path}",
+            "/fig_10/",
+            just_file_names[i].replace(".txt", ""),
+            "_foldedavg_individuals_",
+            str(smoothing_window),
+            "_min_",
+            "fig_10.png",
         )
 
 
