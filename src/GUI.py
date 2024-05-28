@@ -12,6 +12,7 @@ import glob
 import sys  # For outputting stoud to the text widget
 import sys  # For outputting stoud to the text widget
 
+import traceback  # For error handling
 import faulthandler
 
 faulthandler.enable()
@@ -275,6 +276,18 @@ def loadData():
         else:
             print("OK. fig_08 exists")
 
+        if not os.path.exists(SLICED_PATH + "/fig_09"):
+            os.makedirs(SLICED_PATH + "/fig_09")
+            print("Created fig_09 directory")
+        else:
+            print("OK. fig_09 exists")
+
+        if not os.path.exists(SLICED_PATH + "/fig_10"):
+            os.makedirs(SLICED_PATH + "/fig_10")
+            print("Created fig_10 directory")
+        else:
+            print("OK. fig_10 exists")
+
         ###################################################
         ################ READ IN THE DATA #################
         ###################################################
@@ -366,7 +379,7 @@ def loadingThread():
     try:
         threading.Thread(
             target=loadData, daemon=True
-        ).start()  # Daemon is false, to avoid abrupt termination when reading/writing files
+        ).start()  # Daemon is true. Background thread that terminates when main thread terminates.
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -803,7 +816,7 @@ def processData():
                 # New folded_avg_monitor will have indices up to 24 hrs. Here, since the index is in minutes, we will have 1440 minutes in a day + 1,...
                 # so that the index goes from 00:00 to 00:00 the next day.
                 folded_avg_monitor = pd.DataFrame(columns=zscored_monitor.columns)
-                folded_avg_monitor.index.name = "time_bin"
+
                 for column in zscored_monitor:
                     # Fold the data. We can group by the datetime's time, and then calculate the mean for each time.
                     folded_avg_monitor[column] = (
@@ -812,9 +825,19 @@ def processData():
                         .mean()
                     )
 
+
                 # The following seems verbose, but it works to get the correct format.
                 # Slice by the first index, which should be the first time bin, specified by the START_SLICE
                 # Slicing by index name gives a Series where the column names are the index. We only want values.
+
+                # Save the monitor by appending to our list of pd.DataFrames
+                # Note that I save it BEFORE appending the first row to the end of the monitor.
+                folded_avg_monitor.index.name = "time_bin"
+                folded_avg_monitor_dummy = folded_avg_monitor.copy()
+                folded_avg_monitor_dummy.index = pd.to_datetime(
+                    folded_avg_monitor.index, format="%H:%M:%S"
+                )
+                FOLDED_AVG_BATCH[k].append(folded_avg_monitor_dummy)
 
                 first_row = folded_avg_monitor.loc[
                     folded_avg_monitor.index[0]
@@ -843,9 +866,7 @@ def processData():
                     [folded_avg_monitor, first_row_df], axis=0
                 )
 
-                # Save the monitor by appending to our list of pd.DataFrames
-                FOLDED_AVG_BATCH[k].append(folded_avg_monitor)
-
+                folded_avg_monitor.index.name = "time_bin"
                 folded_avg_monitor.to_csv(
                     current_directory
                     + "/folded_average_data"
@@ -855,6 +876,7 @@ def processData():
                 print(
                     f"Saved folded average data to {current_directory}/folded_average_data/folded_avg_{JUST_FILE_NAMES_BATCH[k][i]}"
                 )
+        print("\n\n")
         print("Data processing complete!")
 
     except Exception as e:
@@ -1006,6 +1028,48 @@ def zscoredIndividualPlot(zscored_monitors: list[pd.DataFrame]):
         )
     except Exception as e:
         messagebox.showerror("Error", str(e))
+
+
+def foldedAveragePlot(folded_avg_monitors: list[pd.DataFrame]):
+    try:
+        t_analyze.foldedPlot(
+            folded_avg_monitors,
+            JUST_FILE_NAMES,
+            1,
+            "1900-01-01 00:00:00",
+            "1900-01-01 23:59:00",
+            SMOOTHING_WINDOW,
+            MORNING_RAMP_START,
+            EVENING_RAMP_START,
+            EVENING_RAMP_END,
+            RAMP_TIME,
+            RAMP_END_DATE,
+            SLICED_PATH,
+        )
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+        traceback.print_exc()
+
+
+def foldedAverageIndividualPlot(folded_avg_monitors: list[pd.DataFrame]):
+    try:
+        t_analyze.foldedIndividual(
+            folded_avg_monitors,
+            JUST_FILE_NAMES,
+            1,
+            SMOOTHING_WINDOW,
+            "1900-01-01 00:00:00",
+            "1900-01-01 23:59:00",
+            MORNING_RAMP_START,
+            EVENING_RAMP_START,
+            EVENING_RAMP_END,
+            RAMP_TIME,
+            RAMP_END_DATE,
+            SLICED_PATH,
+        )
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+        traceback.print_exc()
 
 
 # Main GUI
@@ -1301,6 +1365,39 @@ plot_zscored_individual_button = tk.Button(
 )
 plot_zscored_individual_button.grid(row=4, column=2)
 all_widgets.append(plot_zscored_individual_button)
+
+# Plot folded average all
+plot_folded_avg_button_label = tk.Label(
+    button_frame, text="Fig. 9", font=("sans", font_size - 2)
+)
+plot_folded_avg_button_label.grid(row=3, column=3)
+all_widgets.append(plot_folded_avg_button_label)
+
+plot_folded_avg_button = tk.Button(
+    button_frame,
+    text="Folded avg. all",
+    command=lambda: foldedAveragePlot(FOLDED_AVG_MONITORS),
+    font=("sans", font_size),
+)
+plot_folded_avg_button.grid(row=4, column=3)
+all_widgets.append(plot_folded_avg_button)
+
+
+# Plot folded average individuals
+plot_folded_avg_individual_button_label = tk.Label(
+    button_frame, text="Fig. 10", font=("sans", font_size - 2)
+)
+plot_folded_avg_individual_button_label.grid(row=3, column=4)
+all_widgets.append(plot_folded_avg_individual_button_label)
+
+plot_folded_avg_individual_button = tk.Button(
+    button_frame,
+    text="Folded avg. subplots",
+    command=lambda: foldedAverageIndividualPlot(FOLDED_AVG_MONITORS),
+    font=("sans", font_size),
+)
+plot_folded_avg_individual_button.grid(row=4, column=4)
+all_widgets.append(plot_folded_avg_individual_button)
 
 
 #######################
