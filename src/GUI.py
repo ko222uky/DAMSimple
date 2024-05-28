@@ -1025,7 +1025,7 @@ all_widgets.append(fontsize_scale_label)
 
 font_scale_widget = tk.Scale(
     root,
-    from_=10,
+    from_=5,
     to=60,
     orient="horizontal",
     length=1000,
@@ -1160,7 +1160,7 @@ EXCLUDE_ANIMALS_VAR = tk.BooleanVar()
 EXCLUDE_ANIMALS_VAR.trace_add("write", lambda *args: onExclude())
 exclude_animals_checkbutton = tk.Checkbutton(
     root,
-    text="2. Exclude Animals? Check for 'yes':",
+    text="2. Define exclusions (even if none)",
     variable=EXCLUDE_ANIMALS_VAR,
     font=("sans", font_size),
 )
