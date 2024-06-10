@@ -825,7 +825,6 @@ def processData():
                         .mean()
                     )
 
-
                 # The following seems verbose, but it works to get the correct format.
                 # Slice by the first index, which should be the first time bin, specified by the START_SLICE
                 # Slicing by index name gives a Series where the column names are the index. We only want values.
