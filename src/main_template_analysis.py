@@ -204,11 +204,29 @@ def plot_sliced_all(
     xaxis_label: str = "X-axis",
     xticks: str = "6h",
     folded: bool = False,
+    final: bool = False,
 ):
+
     # Assuming `data` is your DataFrame, we will create a plot with a single subplot.
     fig, ax1 = plt.subplots(figsize=(12, 12))
-    # Thus, we only have one Axes object, and that's our entire dataframe.
-    data.plot(ax=ax1, legend=False)
+
+    # If final, plot the SEM and the 'mean' column
+    if final:
+        sem = data['SEM']
+        data['final_mean'].plot(ax=ax1, legend=False)
+        ax1.fill_between(data.index, data['final_mean'] - sem, data['final_mean'] + sem, alpha=0.5)
+        
+    else:
+        data.plot(ax=ax1, legend=False)
+
+    # If we are folding the data, we only want to plot one day.
+    # But it's helpful to know how many days we are folding... We print this in the title.
+    num_days_title = num_days
+
+    if folded:
+        num_days = 1
+
+
 
     start_time = pd.to_datetime(
         start_slice
@@ -257,7 +275,7 @@ def plot_sliced_all(
         ax1.set_title(
             monitor_name
             + f" {graph_title} "  # Unique str for specifying type of data of the graph.
-            + str(num_days)
+            + str(num_days_title)
             + "_days_folded_"
             + "00:00"
             + "_to_"
@@ -804,6 +822,7 @@ def foldedPlot(
             "local time",
             "1h",
             folded=True,
+            final = False
         )
 
         plot.savefig(
@@ -885,6 +904,65 @@ def foldedIndividual(
             str(smoothing_window),
             "_min_",
             "fig_10.png",
+        )
+
+def finalGraph(
+    final_monitors: list[pd.DataFrame],
+    just_file_names: list[str],
+    num_days: int,
+    start_slice: str,
+    end_slice: str,
+    smoothing_window: int,
+    morning_ramp_start: dt_time,
+    evening_ramp_start: dt_time,
+    evening_ramp_end: dt_time,
+    ramp_time: timedelta,
+    ramp_end_date: datetime,
+    sliced_path: str,
+):
+    #################
+    # Plot the sliced folded avg data
+    ################
+    # Iterate through monitors and plot
+    for i, monitor in enumerate(final_monitors):
+        plot = plot_sliced_all(
+            monitor,
+            num_days,
+            start_slice,
+            end_slice,
+            just_file_names[i],
+            morning_ramp_start,
+            evening_ramp_start,
+            evening_ramp_end,
+            ramp_time,
+            ramp_end_date,
+            "final",
+            "zscored avg cnts/min",
+            "local time",
+            "1h",
+            folded=True,
+            final=True
+        )
+
+        plot.savefig(
+            sliced_path
+            + "/fig_11/"
+            + just_file_names[i].replace(".txt", "")
+            + "_final_all_"
+            + str(smoothing_window)
+            + "_min_"
+            + "fig_11.png"
+        )
+        plt.close()
+
+        print(
+            f"Saved final data plot to {sliced_path}",
+            "/fig_11/",
+            just_file_names[i].replace(".txt", ""),
+            "_final_all_",
+            str(smoothing_window),
+            "_min_",
+            "fig_11.png",
         )
 
 

@@ -288,6 +288,12 @@ def loadData():
         else:
             print("OK. fig_10 exists")
 
+        if not os.path.exists(SLICED_PATH + "/fig_11"):
+            os.makedirs(SLICED_PATH + "/fig_11")
+            print("Created fig_11 directory")
+        else:
+            print("OK. fig_11 exists")
+
         ###################################################
         ################ READ IN THE DATA #################
         ###################################################
@@ -577,24 +583,28 @@ def processData():
     global SMOOTHED_BATCH
     global ZSCORED_BATCH
     global FOLDED_AVG_BATCH
+    global FINAL_DATA_BATCH
 
     # Globals for holding the data of the non-excluded animals data
     global SMOOTHED_MONITORS
     global AVG_AND_STD
     global ZSCORED_MONITORS
     global FOLDED_AVG_MONITORS
+    global FINAL_DATA
 
     SMOOTHED_MONITORS = []
     AVG_AND_STD = []
     ZSCORED_MONITORS = []
     FOLDED_AVG_MONITORS = []
+    FINAL_DATA = []
 
-    # Batches hold all of the excluded animal monitor data, too.
+    # Batches hold all of the excluded animal monitor data, too, if we have excluded animal data.
     SLICED_BATCH = [MONITOR_SLICES]
     SMOOTHED_BATCH = [SMOOTHED_MONITORS]
     AVG_AND_STD_BATCH = [AVG_AND_STD]
     ZSCORED_BATCH = [ZSCORED_MONITORS]
     FOLDED_AVG_BATCH = [FOLDED_AVG_MONITORS]
+    FINAL_DATA_BATCH = [FINAL_DATA]
 
     DIRECTORY_BATCH = [SLICED_PATH]
     JUST_FILE_NAMES_BATCH = [JUST_FILE_NAMES]
@@ -605,11 +615,13 @@ def processData():
         global EXCLUDED_ANIMALS_AVG_STD
         global EXCLUDED_ANIMALS_ZSCORED
         global EXCLUDED_ANIMALS_FOLDED_AVG
+        global EXCLUDED_FINAL_DATA
 
         EXCLUDED_ANIMALS_SMOOTHED = []
         EXCLUDED_ANIMALS_AVG_STD = []
         EXCLUDED_ANIMALS_ZSCORED = []
         EXCLUDED_ANIMALS_FOLDED_AVG = []
+        EXCLUDED_FINAL_DATA = []
 
         try:
             print("Excluded animals data will be included in the data processing")
@@ -620,6 +632,7 @@ def processData():
             AVG_AND_STD_BATCH.append(EXCLUDED_ANIMALS_AVG_STD)
             ZSCORED_BATCH.append(EXCLUDED_ANIMALS_ZSCORED)
             FOLDED_AVG_BATCH.append(EXCLUDED_ANIMALS_FOLDED_AVG)
+            FINAL_DATA_BATCH.append(EXCLUDED_FINAL_DATA)
 
             DIRECTORY_BATCH.append(EXCLUDE_ANIMALS_UNIQUE_PATH)
 
@@ -656,6 +669,13 @@ def processData():
                     print(f"Created {DIRECTORY_BATCH[k]}/folded_average_data directory")
                 else:
                     print(f"OK. {DIRECTORY_BATCH[k]}/folded_average_data exists")
+                
+                # final data dir
+                if not os.path.exists(DIRECTORY_BATCH[k] + "/final_avg_data"):
+                    os.makedirs(DIRECTORY_BATCH[k] + "/final_avg_data")
+                    print(f"Created {DIRECTORY_BATCH[k]}/final_avg_data directory")
+                else:
+                    print(f"OK. {DIRECTORY_BATCH[k]}/final_avg_data exists")
 
             if k > 0:  # This corresponds to our excluded animals.
                 print("######################################\n\n")
@@ -681,6 +701,13 @@ def processData():
                         print(f"Created {path}/folded_average_data directory")
                     else:
                         print(f"OK. {path}/folded_average_data exists")
+
+                    # final avg data dir
+                    if not os.path.exists(path + "/final_avg_data"):
+                        os.makedirs(path + "/final_avg_data")
+                        print(f"Created {path}/final_avg_data directory")
+                    else:
+                        print(f"OK. {path}/final_avg_data exists")
 
             # Calculate running average (in minutes) for each animal column
             for i, monitor in enumerate(SLICED_DATA_LIST):
@@ -875,6 +902,43 @@ def processData():
                 print(
                     f"Saved folded average data to {current_directory}/folded_average_data/folded_avg_{JUST_FILE_NAMES_BATCH[k][i]}"
                 )
+
+            print("\n\n")
+            print("Calculating final average with SEM...")
+            # Calculate final data
+            for i, folded_avg_monitor in enumerate(FOLDED_AVG_BATCH[k]):
+                if k > 0:
+                    current_directory = DIRECTORY_BATCH[k][i]
+
+                # Calculate the final data
+                final_data = pd.DataFrame(index=folded_avg_monitor.index)
+
+                final_data["final_mean"] = folded_avg_monitor.mean(axis=1) # axis 1 is row-wise
+                final_data["SEM"] = folded_avg_monitor.sem(axis=1)
+
+                FINAL_DATA_BATCH[k].append(final_data)
+
+                # append first row to the end of the final data
+                first_row = final_data.loc[final_data.index[0]].values
+                first_row = first_row.reshape(1, -1)
+                first_row_df = pd.DataFrame(first_row, columns=final_data.columns)
+                first_row_df.index = [final_data.index[0]]
+                final_data = pd.concat([final_data, first_row_df], axis=0)
+
+                final_data.index = pd.to_datetime(final_data.index, format="%H:%M:%S")
+                final_data.index.name = "time_bin"
+
+                final_data.to_csv(
+                    current_directory
+                    + "/final_avg_data"
+                    + f"/final_data_{JUST_FILE_NAMES_BATCH[k][i]}",
+                    sep="\t",
+                )
+
+                print(
+                    f"Saved final data to {current_directory}/folded_average_data/final_data_{JUST_FILE_NAMES_BATCH[k][i]}"
+                )
+
         print("\n\n")
         print("Data processing complete!")
 
@@ -904,6 +968,31 @@ def rawPlot(monitor_files: list[pd.DataFrame]):
         t_analyze.rawPlot(
             monitor_files, JUST_FILE_NAMES, PREPARED_PATH
         )  # Add global variables as arguments if needed
+
+        # Whereas the raw data consists of a LIST of monitors with a single path, the excluded animals data consists of a LIST of monitors with a LIST of paths.
+        # How can I iterate through excluded animals data and pass the paths as separate strings while passing the single monitors as a list?
+        # I simple pass the element as a new list. This way, I can iterate through the list of monitors and pass the list of paths as a single element.
+        if EXCLUDE_COMMIT:
+            for i, monitor in enumerate(EXCLUDED_ANIMALS_MONITOR_FILES):
+            
+                # create a fig_01 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_01"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_01")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_01 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_01 exists")
+
+                # create a fig_02 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_02"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_02")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_02 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_02 exists")
+
+                # Plot the raw for each unique excluded monitor data. 
+                t_analyze.rawPlot(
+                    [monitor], JUST_FILE_NAMES_EXCLUDED, EXCLUDE_ANIMALS_UNIQUE_PATH[i]
+                )
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -1034,7 +1123,7 @@ def foldedAveragePlot(folded_avg_monitors: list[pd.DataFrame]):
         t_analyze.foldedPlot(
             folded_avg_monitors,
             JUST_FILE_NAMES,
-            1,
+            NUM_DAYS,
             "1900-01-01 00:00:00",
             "1900-01-01 23:59:00",
             SMOOTHING_WINDOW,
@@ -1055,7 +1144,7 @@ def foldedAverageIndividualPlot(folded_avg_monitors: list[pd.DataFrame]):
         t_analyze.foldedIndividual(
             folded_avg_monitors,
             JUST_FILE_NAMES,
-            1,
+            NUM_DAYS,
             SMOOTHING_WINDOW,
             "1900-01-01 00:00:00",
             "1900-01-01 23:59:00",
@@ -1065,6 +1154,26 @@ def foldedAverageIndividualPlot(folded_avg_monitors: list[pd.DataFrame]):
             RAMP_TIME,
             RAMP_END_DATE,
             SLICED_PATH,
+        )
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
+        traceback.print_exc()
+
+def finalAverageGraph(final_data: list[pd.DataFrame]):
+    try:
+        t_analyze.finalGraph(
+            final_data,
+            JUST_FILE_NAMES,
+            NUM_DAYS,
+            "1900-01-01 00:00:00",
+            "1900-01-01 23:59:00",
+            SMOOTHING_WINDOW,
+            MORNING_RAMP_START,
+            EVENING_RAMP_START,
+            EVENING_RAMP_END,
+            RAMP_TIME,
+            RAMP_END_DATE,
+            SLICED_PATH
         )
     except Exception as e:
         messagebox.showerror("Error", str(e))
@@ -1337,7 +1446,7 @@ all_widgets.append(plot_running_average_individual_button)
 plot_zscored_button_label = tk.Label(
     button_frame, text="Fig. 7", font=("sans", font_size - 2)
 )
-plot_zscored_button_label.grid(row=3, column=1)
+plot_zscored_button_label.grid(row=3, column=0)
 all_widgets.append(plot_zscored_button_label)
 
 plot_zscored_button = tk.Button(
@@ -1346,14 +1455,14 @@ plot_zscored_button = tk.Button(
     command=lambda: zscoredPlot(ZSCORED_MONITORS),
     font=("sans", font_size),
 )
-plot_zscored_button.grid(row=4, column=1)
+plot_zscored_button.grid(row=4, column=0)
 all_widgets.append(plot_zscored_button)
 
 # Plot z-scored individuals
 plot_zscored_individual_button_label = tk.Label(
     button_frame, text="Fig. 8", font=("sans", font_size - 2)
 )
-plot_zscored_individual_button_label.grid(row=3, column=2)
+plot_zscored_individual_button_label.grid(row=3, column=1)
 all_widgets.append(plot_zscored_individual_button_label)
 
 plot_zscored_individual_button = tk.Button(
@@ -1362,14 +1471,14 @@ plot_zscored_individual_button = tk.Button(
     command=lambda: zscoredIndividualPlot(ZSCORED_MONITORS),
     font=("sans", font_size),
 )
-plot_zscored_individual_button.grid(row=4, column=2)
+plot_zscored_individual_button.grid(row=4, column=1)
 all_widgets.append(plot_zscored_individual_button)
 
 # Plot folded average all
 plot_folded_avg_button_label = tk.Label(
     button_frame, text="Fig. 9", font=("sans", font_size - 2)
 )
-plot_folded_avg_button_label.grid(row=3, column=3)
+plot_folded_avg_button_label.grid(row=3, column=2)
 all_widgets.append(plot_folded_avg_button_label)
 
 plot_folded_avg_button = tk.Button(
@@ -1378,7 +1487,7 @@ plot_folded_avg_button = tk.Button(
     command=lambda: foldedAveragePlot(FOLDED_AVG_MONITORS),
     font=("sans", font_size),
 )
-plot_folded_avg_button.grid(row=4, column=3)
+plot_folded_avg_button.grid(row=4, column=2)
 all_widgets.append(plot_folded_avg_button)
 
 
@@ -1386,7 +1495,7 @@ all_widgets.append(plot_folded_avg_button)
 plot_folded_avg_individual_button_label = tk.Label(
     button_frame, text="Fig. 10", font=("sans", font_size - 2)
 )
-plot_folded_avg_individual_button_label.grid(row=3, column=4)
+plot_folded_avg_individual_button_label.grid(row=3, column=3)
 all_widgets.append(plot_folded_avg_individual_button_label)
 
 plot_folded_avg_individual_button = tk.Button(
@@ -1395,9 +1504,24 @@ plot_folded_avg_individual_button = tk.Button(
     command=lambda: foldedAverageIndividualPlot(FOLDED_AVG_MONITORS),
     font=("sans", font_size),
 )
-plot_folded_avg_individual_button.grid(row=4, column=4)
+plot_folded_avg_individual_button.grid(row=4, column=3)
 all_widgets.append(plot_folded_avg_individual_button)
 
+# Plot final graph, which is the average FOLDED average among all individuals
+plot_final_graph_button_label = tk.Label(
+    button_frame, text="Fig. 11", font=("sans", font_size - 2)
+)
+plot_final_graph_button_label.grid(row=3, column=4)
+all_widgets.append(plot_final_graph_button_label)
+
+plot_final_graph_button = tk.Button(
+    button_frame,
+    text="Final graph",
+    command=lambda: finalAverageGraph(FINAL_DATA),
+    font=("sans", font_size),
+)
+plot_final_graph_button.grid(row=4, column=4)
+all_widgets.append(plot_final_graph_button)
 
 #######################
 # END OF BUTTONS
