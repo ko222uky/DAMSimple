@@ -1,7 +1,6 @@
 # tkinter for GUI
 import tkinter as tk
 from tkinter import ttk  # access to the Tk themed widget set
-from tkinter import ttk  # access to the Tk themed widget set
 from tkinter import messagebox
 
 import threading
@@ -10,7 +9,7 @@ import queue  # To handle thread-safety for writing to GUI widget
 import os
 import glob
 import sys  # For outputting stoud to the text widget
-import sys  # For outputting stoud to the text widget
+
 
 import traceback  # For error handling
 import faulthandler
@@ -741,7 +740,7 @@ def processData():
                     # Note that avg and std are calculated from the SMOOTHED data.
                     avg_and_std.loc["mean", column] = smoothed_monitor[
                         smoothed_column_name
-                    ].mean()
+                    ].mean() # access specific cell under index "mean" and column "column"
                     avg_and_std.loc["std", column] = smoothed_monitor[
                         smoothed_column_name
                     ].std()
@@ -809,13 +808,15 @@ def processData():
                 )
 
                 for j, column in enumerate(zscored_monitor.columns):
-                    # Now, for each column in the zscored_monitor, I will assign it to a column of z-scores
+                    # Now, for each column in the zscored_monitor, I will assign to it a column of z-scores
                     # which are calculated from the smoothed_monitor files.
                     # I will use the mean and std from the AVG_AND_STD df to calculate the z-scores.
 
+                    # for a specific column, which contains the animal ID, we calcualte the Z-score using that animal ID's mean and STD.
+                    # I'm slicing in two different ways, which might confuse some. But I'm slicing the AVG_AND_STD df by the column name, which is the animal ID, using .loc
                     zscored_monitor[column] = smoothed_monitor.iloc[:, j].apply(
-                        lambda x: (x - AVG_AND_STD_BATCH[k][i].loc["mean", column])
-                        / AVG_AND_STD_BATCH[k][i].loc["std", column]
+                        lambda x: (x - AVG_AND_STD_BATCH[k][i].loc["mean", column]) # accessing a specific cell that contains the mean...
+                        / AVG_AND_STD_BATCH[k][i].loc["std", column] # accessing a specific cell that contains the std...
                     )
 
                 ZSCORED_BATCH[k].append(zscored_monitor)
@@ -925,7 +926,7 @@ def processData():
                 first_row_df.index = [final_data.index[0]]
                 final_data = pd.concat([final_data, first_row_df], axis=0)
 
-                final_data.index = pd.to_datetime(final_data.index, format="%H:%M:%S")
+                final_data.index = pd.to_datetime(final_data.index, format="%H:%M:%S").time
                 final_data.index.name = "time_bin"
 
                 final_data.to_csv(
@@ -991,8 +992,11 @@ def rawPlot(monitor_files: list[pd.DataFrame]):
 
                 # Plot the raw for each unique excluded monitor data. 
                 t_analyze.rawPlot(
-                    [monitor], JUST_FILE_NAMES_EXCLUDED, EXCLUDE_ANIMALS_UNIQUE_PATH[i]
+                    [monitor], [JUST_FILE_NAMES_EXCLUDED[i]], EXCLUDE_ANIMALS_UNIQUE_PATH[i]
                 )
+        # Also note: The above is redundant, since the excluded animals data is already sliced. So it is not "raw" in the true sense.
+        # I include this here just for completion.
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -1013,6 +1017,32 @@ def slicedPlot(monitor_slices: list[pd.DataFrame]):
             RAMP_TIME,
             RAMP_END_DATE,
         )  # Add global variables as arguments if needed
+
+        if EXCLUDE_COMMIT:
+            for i, monitor in enumerate(EXCLUDED_ANIMALS_MONITOR_FILES):
+            
+                # create a fig_03 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_03"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_03")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_03 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_03 exists")
+
+                # Plot the raw for each unique excluded monitor data. 
+                t_analyze.slicedPlot(
+                    [monitor],
+                    [JUST_FILE_NAMES_EXCLUDED[i]],
+                    EXCLUDE_ANIMALS_UNIQUE_PATH[i],
+                    START_SLICE,
+                    END_SLICE,
+                    NUM_DAYS,
+                    MORNING_RAMP_START,
+                    EVENING_RAMP_START,
+                    EVENING_RAMP_END,
+                    RAMP_TIME,
+                    RAMP_END_DATE,
+                )
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -1034,6 +1064,32 @@ def slicedIndividualPlot(monitor_slices: list[pd.DataFrame]):
             RAMP_END_DATE,
         )  # Add global variables as arguments if neede
         # Add global variables as arguments if needed
+
+        if EXCLUDE_COMMIT:
+            for i, monitor in enumerate(EXCLUDED_ANIMALS_MONITOR_FILES):
+            
+                # create a fig_03 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_04"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_04")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_04 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_04 exists")
+
+                # Plot the raw for each unique excluded monitor data. 
+                t_analyze.slicedIndividualPlot(
+                    [monitor],
+                    [JUST_FILE_NAMES_EXCLUDED[i]],
+                    EXCLUDE_ANIMALS_UNIQUE_PATH[i],
+                    START_SLICE,
+                    END_SLICE,
+                    NUM_DAYS,
+                    MORNING_RAMP_START,
+                    EVENING_RAMP_START,
+                    EVENING_RAMP_END,
+                    RAMP_TIME,
+                    RAMP_END_DATE,
+                )
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -1054,6 +1110,34 @@ def runningAveragePlot(smoothed_monitors: list[pd.DataFrame]):
             RAMP_END_DATE,
             SLICED_PATH,
         )
+
+
+        if EXCLUDE_COMMIT:
+            for i, monitor in enumerate(EXCLUDED_ANIMALS_SMOOTHED):
+            
+                # create a fig_03 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_05"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_05")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_05 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_05 exists")
+
+                # Plot the raw for each unique excluded monitor data. 
+                t_analyze.smoothedPlot(
+                    [monitor],
+                    [JUST_FILE_NAMES_EXCLUDED[i]],
+                    NUM_DAYS,
+                    START_SLICE,
+                    END_SLICE,
+                    SMOOTHING_WINDOW,
+                    MORNING_RAMP_START,
+                    EVENING_RAMP_START,
+                    EVENING_RAMP_END,
+                    RAMP_TIME,
+                    RAMP_END_DATE,
+                    EXCLUDE_ANIMALS_UNIQUE_PATH[i],
+                )
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -1074,6 +1158,33 @@ def runningAverageIndividualPlot(smoothed_monitors: list[pd.DataFrame]):
             RAMP_END_DATE,
             SLICED_PATH,
         )
+
+        if EXCLUDE_COMMIT:
+            for i, monitor in enumerate(EXCLUDED_ANIMALS_SMOOTHED):
+            
+                # create a fig_03 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_06"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_06")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_06 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_06 exists")
+
+                # Plot the raw for each unique excluded monitor data. 
+                t_analyze.smoothedPlotIndividual(
+                    [monitor],
+                    [JUST_FILE_NAMES_EXCLUDED[i]],
+                    NUM_DAYS,
+                    SMOOTHING_WINDOW,
+                    START_SLICE,
+                    END_SLICE,
+                    MORNING_RAMP_START,
+                    EVENING_RAMP_START,
+                    EVENING_RAMP_END,
+                    RAMP_TIME,
+                    RAMP_END_DATE,
+                    EXCLUDE_ANIMALS_UNIQUE_PATH[i],
+                )
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -1094,6 +1205,33 @@ def zscoredPlot(zscored_monitors: list[pd.DataFrame]):
             RAMP_END_DATE,
             SLICED_PATH,
         )
+
+        if EXCLUDE_COMMIT:
+            for i, monitor in enumerate(EXCLUDED_ANIMALS_ZSCORED):
+            
+                # create a fig_06 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_07"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_07")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_07 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_07 exists")
+
+
+                t_analyze.zscoredPlot(
+                    [monitor],
+                    [JUST_FILE_NAMES_EXCLUDED[i]],
+                    NUM_DAYS,
+                    START_SLICE,
+                    END_SLICE,
+                    SMOOTHING_WINDOW,
+                    MORNING_RAMP_START,
+                    EVENING_RAMP_START,
+                    EVENING_RAMP_END,
+                    RAMP_TIME,
+                    RAMP_END_DATE,
+                    EXCLUDE_ANIMALS_UNIQUE_PATH[i],
+                )
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -1114,6 +1252,32 @@ def zscoredIndividualPlot(zscored_monitors: list[pd.DataFrame]):
             RAMP_END_DATE,
             SLICED_PATH,
         )
+
+        if EXCLUDE_COMMIT:
+            for i, monitor in enumerate(EXCLUDED_ANIMALS_ZSCORED):
+            
+                # create a fig_07 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_08"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_08")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_08 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_08 exists")
+
+                t_analyze.zscoredIndividual(
+                    [monitor],
+                    [JUST_FILE_NAMES_EXCLUDED[i]],
+                    NUM_DAYS,
+                    SMOOTHING_WINDOW,
+                    START_SLICE,
+                    END_SLICE,
+                    MORNING_RAMP_START,
+                    EVENING_RAMP_START,
+                    EVENING_RAMP_END,
+                    RAMP_TIME,
+                    RAMP_END_DATE,
+                    EXCLUDE_ANIMALS_UNIQUE_PATH[i],
+                )
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -1134,6 +1298,31 @@ def foldedAveragePlot(folded_avg_monitors: list[pd.DataFrame]):
             RAMP_END_DATE,
             SLICED_PATH,
         )
+
+        if EXCLUDE_COMMIT:
+            for i, monitor in enumerate(EXCLUDED_ANIMALS_FOLDED_AVG):
+            
+                # create a fig_08 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_09"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_09")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_09 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_09 exists")
+
+                t_analyze.foldedPlot(
+                    [monitor],
+                    [JUST_FILE_NAMES_EXCLUDED[i]],
+                    NUM_DAYS,
+                    "1900-01-01 00:00:00",
+                    "1900-01-01 23:59:00",
+                    SMOOTHING_WINDOW,
+                    MORNING_RAMP_START,
+                    EVENING_RAMP_START,
+                    EVENING_RAMP_END,
+                    RAMP_TIME,
+                    RAMP_END_DATE,
+                    EXCLUDE_ANIMALS_UNIQUE_PATH[i],
+                )
     except Exception as e:
         messagebox.showerror("Error", str(e))
         traceback.print_exc()
@@ -1155,6 +1344,32 @@ def foldedAverageIndividualPlot(folded_avg_monitors: list[pd.DataFrame]):
             RAMP_END_DATE,
             SLICED_PATH,
         )
+
+        if EXCLUDE_COMMIT:
+            for i, monitor in enumerate(EXCLUDED_ANIMALS_FOLDED_AVG):
+            
+                # create a fig_09 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_10"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_10")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_10 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_10 exists")
+
+                t_analyze.foldedIndividual(
+                    [monitor],
+                    [JUST_FILE_NAMES_EXCLUDED[i]],
+                    NUM_DAYS,
+                    SMOOTHING_WINDOW,
+                    "1900-01-01 00:00:00",
+                    "1900-01-01 23:59:00",
+                    MORNING_RAMP_START,
+                    EVENING_RAMP_START,
+                    EVENING_RAMP_END,
+                    RAMP_TIME,
+                    RAMP_END_DATE,
+                    EXCLUDE_ANIMALS_UNIQUE_PATH[i],
+                )
+            
     except Exception as e:
         messagebox.showerror("Error", str(e))
         traceback.print_exc()
@@ -1175,6 +1390,32 @@ def finalAverageGraph(final_data: list[pd.DataFrame]):
             RAMP_END_DATE,
             SLICED_PATH
         )
+
+        if EXCLUDE_COMMIT:
+            for i, monitor in enumerate(EXCLUDED_FINAL_DATA):
+            
+                # create a fig_10 directory for each monitor
+                if not os.path.exists(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_11"):
+                    os.makedirs(EXCLUDE_ANIMALS_UNIQUE_PATH[i] + "/fig_11")
+                    print(f"Created {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_11 directory")
+                else:
+                    print(f"OK. {EXCLUDE_ANIMALS_UNIQUE_PATH[i]}/fig_11 exists")
+
+                t_analyze.finalGraph(
+                    [monitor],
+                    [JUST_FILE_NAMES_EXCLUDED[i]],
+                    NUM_DAYS,
+                    "1900-01-01 00:00:00",
+                    "1900-01-01 23:59:00",
+                    SMOOTHING_WINDOW,
+                    MORNING_RAMP_START,
+                    EVENING_RAMP_START,
+                    EVENING_RAMP_END,
+                    RAMP_TIME,
+                    RAMP_END_DATE,
+                    EXCLUDE_ANIMALS_UNIQUE_PATH[i],
+                )
+
     except Exception as e:
         messagebox.showerror("Error", str(e))
         traceback.print_exc()

@@ -432,30 +432,30 @@ def rawPlot(
         )
         plt.close()
         print(
-            f"Saved raw data plot to {result_path + '/fig_01/' + just_file_names[i].replace('.txt', '') + '_raw_data_fig1.png'}"
+            f"Saved raw data plot to {result_path + '/fig_01/' + just_file_names[i].replace('.txt', '') + '_raw_data_fig_01.png'}"
         )
 
-        #################
-        # Subplots for each animal
-        ################
+    #################
+    # Subplots for each animal
+    ################
 
-        for j, monitor in enumerate(monitor_files):
-            plot = subplots_raw(
-                monitor,
-                j,
-                3,  # Intervals of days for the x-axis
-                just_file_names[j].replace(".txt", ""),
-            )
-            plot.savefig(
-                result_path
-                + "/fig_02/"
-                + just_file_names[j].replace(".txt", "")
-                + "_raw_individuals_fig_02.png"
-            )
-            plt.close()
-            print(
-                f"Saved raw individuals data plot to {result_path + '/fig_02/' + just_file_names[j].replace('.txt', '') + '_raw_individuals_fig_02.png'}"
-            )
+    for j, monitor in enumerate(monitor_files):
+        plot = subplots_raw(
+            monitor,
+            j,
+            3,  # Intervals of days for the x-axis
+            just_file_names[j].replace(".txt", ""),
+        )
+        plot.savefig(
+            result_path
+            + "/fig_02/"
+            + just_file_names[j].replace(".txt", "")
+            + "_raw_individuals_fig_02.png"
+        )
+        plt.close()
+        print(
+            f"Saved raw individuals data plot to {result_path + '/fig_02/' + just_file_names[j].replace('.txt', '') + '_raw_individuals_fig_02.png'}"
+        )
 
 
 # fig 3
