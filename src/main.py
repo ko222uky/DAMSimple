@@ -1427,6 +1427,9 @@ root.configure(bg="#90EE90", bd=25, relief="ridge", cursor="arrow")
 all_widgets = []
 font_size = 14
 
+# icon bitmap
+root.iconbitmap("icon/fly.ico")
+
 # Create a scale widget for the font size
 fontsize_scale_label = tk.Label(
     root,
