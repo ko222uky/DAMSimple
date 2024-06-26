@@ -3,6 +3,6 @@ src/*.ipynb
 src/log.txt
 src/__pycache__
 src/pyinstaller_builds
+example-data
 logs/*.log
-
 test_template
