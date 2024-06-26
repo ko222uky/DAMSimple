@@ -25,6 +25,10 @@ The DamnSimple fly is AI-generated.
 
 ## Installation
 
+**All needed files are in the DamnSimple.zip, which are available according to OS under releases:**
+
+    https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/releases
+
 I built this as a standalone binary to avoid the need to install the dependencies since some organizations have a chokehold on their systems such that one cannot install things as one pleases.
 That is annoying.
 Handing someone a USB stick or a zipped folder circumvents this annoyance. 
@@ -32,12 +36,8 @@ Handing someone a USB stick or a zipped folder circumvents this annoyance.
 I mainly use Linux, and the program tested fine on Linux Mint 21.3, on Debian 12 stable, and on my tiny Raspberry Pi 4 running Kali Linux.
 But not everyone uses Linux, so I made a build for Windows, too.
 
-All needed files are in the DamnSimple directory, which are available under releases:
 
-    https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/releases
-
-
-Important Notes:
+**Important Notes:**
 
   The executable is located in the 'bin' directory.
   Do not move the _internal directory, as this is needed by the executable.
