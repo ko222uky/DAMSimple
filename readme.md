@@ -2,8 +2,24 @@
 Version 1.0
 (by Kenneth O'Dell Jr.)
 
-## Description
+![damnsimple-fly](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/1b2b437b-9b65-4bdd-afda-5f5fd0f955aa)
 
+## Example of the GUI:
+![image](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/2ba4f9b1-6c68-4c13-82ab-fe6c42ac2f41)
+
+## Exclude Animals:
+![image](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/035c1fd6-d832-476e-bd1c-c1a8f3605aad)
+
+## Example Experiment Directory (After Processing):
+![Screenshot from 2024-06-26 16-48-09](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/8be7abc6-7097-466b-85fe-5b921d4001df)
+
+
+## Get a Quick Final Graph:
+![Monitor11_final_all_30_min_fig_11](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/96bc12ec-db28-4f16-92e2-ce4a13fa1773)
+
+
+## Description
+...coming soon...
 
 
 ## Installation
@@ -43,7 +59,7 @@ Important Notes:
 
 
 ## How to Use
-
+...coming soon...
 
 
 
