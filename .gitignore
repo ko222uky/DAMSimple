@@ -1,8 +1,8 @@
 # For when I was testing some of the visualizations in Jupyter notebooks
 src/*.ipynb
-
 src/log.txt
 src/__pycache__
+src/pyinstaller_builds
 logs/*.log
 
 test_template
