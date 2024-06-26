@@ -32,11 +32,11 @@ Handing someone a USB stick or a zipped folder circumvents this annoyance.
 I mainly use Linux, and the program tested fine on Linux Mint 21.3, on Debian 12 stable, and on my tiny Raspberry Pi 4 running Kali Linux.
 But not everyone uses Linux, so I made a build for Windows, too.
 
-All needed files are in the DamnSimple directory, located in their respective system directory:
+All needed files are in the DamnSimple directory, which are available according to OS:
 
 For Windows:
 
-    src/pyinstaller_builds/windows/DamnSimple
+    [src/pyinstaller_builds/windows/DamnSimple](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/releases)
 
 For Linux:
 
