@@ -1,17 +1,12 @@
-Damn Simple: A GUI for the Simple Visualization of DAM Data
+# Damn Simple: A GUI for the Simple Visualization of DAM Data
 Version 1.0
-
 (by Kenneth O'Dell Jr.)
 
-#######################################
-############ DESCRIPTION ##############
-#######################################
+## Description
 
 
 
-#######################################
-############ INSTALLATION #############
-#######################################
+## Installation
 
 I built this as a standalone binary to avoid the need to install the dependencies since some organizations have a chokehold on their systems such that one cannot install things as one pleases.
 That is annoying.
@@ -47,17 +42,12 @@ Important Notes:
 
 
 
-
-#######################################
-############ HOW TO USE ###############
-#######################################
+## How to Use
 
 
 
 
-#######################################
-############ EXAMPLE DATA #############
-#######################################
+## Example Data
 
 The Monitor11.txt example data comes from the tutorial for Rethomics, which is a framework for high-throughput behavioral analysis.
 See https://rethomics.github.io/damr.html
