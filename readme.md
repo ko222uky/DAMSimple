@@ -36,7 +36,7 @@ All needed files are in the DamnSimple directory, which are available according 
 
 For Windows:
 
-    [src/pyinstaller_builds/windows/DamnSimple](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/releases)
+    https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/releases
 
 For Linux:
 
