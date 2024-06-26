@@ -27,4 +27,5 @@ Version 1.0
 #######################################
 
 The Monitor11.txt example data comes from the tutorial for Rethomics, which is a framework for high-throughput behavioral analysis.
+See https://rethomics.github.io/damr.html
 
