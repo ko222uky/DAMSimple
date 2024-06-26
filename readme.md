@@ -1,5 +1,5 @@
 # Damn Simple: A GUI for the Simple Visualization of DAM Data
-Version 1.0
+Version 1.0.0
 (by Kenneth O'Dell Jr.)
 
 ![damnsimple-fly](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/1b2b437b-9b65-4bdd-afda-5f5fd0f955aa)
@@ -32,20 +32,15 @@ Handing someone a USB stick or a zipped folder circumvents this annoyance.
 I mainly use Linux, and the program tested fine on Linux Mint 21.3, on Debian 12 stable, and on my tiny Raspberry Pi 4 running Kali Linux.
 But not everyone uses Linux, so I made a build for Windows, too.
 
-All needed files are in the DamnSimple directory, which are available according to OS:
-
-For Windows:
+All needed files are in the DamnSimple directory, which are available under releases:
 
     https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/releases
 
-For Linux:
-
-    src/pyinstaller_builds/linux/DamnSimple
 
 Important Notes:
 
   The executable is located in the 'bin' directory.
-  Do not move the _internal directory.
+  Do not move the _internal directory, as this is needed by the executable.
   Do not move the icon directory.
   Directories containing your experimental data should be sibling directories to the bin directory.
   An example_data directory is provided to test the program.
