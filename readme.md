@@ -3,7 +3,7 @@ Version 1.0.0
 (by Kenneth O'Dell Jr.)
 
 ![damnsimple-fly](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/1b2b437b-9b65-4bdd-afda-5f5fd0f955aa)
-The DamnSimple fly is AI-generated.
+The DAMSimple fly is AI-generated.
 
 ## Example of the GUI:
 ![image](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/2ba4f9b1-6c68-4c13-82ab-fe6c42ac2f41)
