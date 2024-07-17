@@ -1,4 +1,4 @@
-# DamnSimple: A GUI for the Simple Visualization of DAM Data
+# DAMSimple: A GUI for the Simple Visualization of DAM Data
 Version 1.0.0
 (by Kenneth O'Dell Jr.)
 
