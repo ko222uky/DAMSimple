@@ -56,7 +56,12 @@ But not everyone uses Linux, so I made a build for Windows, too.
 
 ## How to Use
 ...coming soon...
-
+#### With regards to the light-dark bars drawn on the graphs:
+The LD bars are purely for aesthetic purposes, and none of the calculations are impacted by the photoregime parameters.
+Thus, the date for the DD analaysis start is simply for drawing total dark bars.
+When entering the DD analysis start date, use the date before the transition day.
+E.g., if 2024-03-31 is the transition day, then enter 2024-03-30.
+It is up to the user to verify the correctness of the outputted graphs, in case unforeseen contingencies (e.g., data formatting) somehow affect the output.
 
 
 ## Example Data
