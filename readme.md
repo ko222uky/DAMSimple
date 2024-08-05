@@ -9,7 +9,8 @@ The DAMSimple fly is AI-generated.
 ![image](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/2ba4f9b1-6c68-4c13-82ab-fe6c42ac2f41)
 
 ## Exclude Animals:
-![image](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/035c1fd6-d832-476e-bd1c-c1a8f3605aad)
+![checkboxes](https://github.com/user-attachments/assets/803a3f94-2b84-4244-a25a-4b00d752082b)
+
 
 ## Example Experiment Directory (After Processing):
 ![Screenshot from 2024-06-26 16-48-09](https://github.com/ko222uky/DamnSimpleLocomotorAnalysis/assets/111385224/8be7abc6-7097-466b-85fe-5b921d4001df)
