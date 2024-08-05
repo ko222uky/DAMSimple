@@ -425,21 +425,40 @@ def excludableAnimals(
     options_window.configure(bg="#90EE90")
     options_window_label.pack()
 
+
+    # Create a separate frame for the buttons, so I can use a grid layout
+    button_frame_checkboxes = tk.Frame(options_window)
+    button_frame_checkboxes.configure(bg="#90EE90")
+    button_frame_checkboxes.pack()
+    button_frame_checkboxes_label = tk.Label(
+        button_frame_checkboxes, text="Plotting options", font=("sans", font_size, "bold")
+    )
+    button_frame_checkboxes_label.grid(row=0, column=0, columnspan=4)
+
     animal_vars = []  # Holds the checkbox tkinter variables
 
-    # Create 32 checkboxes
-    for i in range(1, 33):
-        var = tk.BooleanVar()
-        checkbutton = tk.Checkbutton(
-            options_window, text=f"Animal {i}", variable=var, font=("sans", font_size)
-        )
-        checkbutton.pack()
-        checkbutton.configure(bg="#90EE90", border=5, relief="raised", cursor="hand2")
+    k = 0  # Counter for the animals
 
-        animal_vars.append(var)
-        # The boolean values are not user-defined until the user actually checks some boxes (or not!)
-        # So I need to obtain the boolean values later, when using them.
-        # For that, I will use a list comprehension to get the boolean values from the checkbox entries
+    # Create 32 checkboxes
+    for i in range(1, 5): # iter i will define the rows, so there are 4 rows
+        for j in range(1, 9): # iter j will define the columns, so there are 8 columns
+            k += 1
+            var = tk.BooleanVar()
+            checkbutton = tk.Checkbutton(
+                button_frame_checkboxes, text=f"{k}", variable=var, font=("sans", font_size)
+            )
+
+            # To prevent checkbox labels from overlapping, do NOT include column span.
+            checkbutton.grid(row=i, column=j)
+            checkbutton.configure(bg="#90EE90", border=5, relief="raised", cursor="hand2")
+
+            animal_vars.append(var)
+            # The boolean values are not user-defined until the user actually checks some boxes (or not!)
+            # So I need to obtain the boolean values later, when using them.
+            # For that, I will use a list comprehension to get the boolean values from the checkbox entries
+
+
+    # Close button
 
     close_button = tk.Button(
         options_window,
@@ -951,7 +970,7 @@ def processDataThread():
     try:
         threading.Thread(
             target=processData, daemon=True
-        ).start()  # Daemon is false, to avoid abrupt termination when reading/writing files
+        ).start()  # Daemon is True, so we can close the program without waiting for the thread to finish.
     except Exception as e:
         messagebox.showerror("Error", str(e))
 
@@ -1441,7 +1460,7 @@ all_widgets.append(fontsize_scale_label)
 
 font_scale_widget = tk.Scale(
     root,
-    from_=5,
+    from_=2,
     to=60,
     orient="horizontal",
     length=1000,
